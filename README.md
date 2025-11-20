@@ -1,4 +1,4 @@
-# ENIGMA - Edge-Fog-Cloud Platform Generator for SimGrid
+# ENIGMA - gENeric Iot edGe siMulAtor
 
 A C++ project that enables creation of XML platforms for Edge, Fog, and Cloud infrastructures, with applications using SimGrid 4.1 for simulation.
 
