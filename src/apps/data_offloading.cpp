@@ -17,72 +17,91 @@ class SmartEdgeDevice {
     std::string fog_name;
     std::string cloud_name;
     double workload;
+    int num_tasks;
     
 public:
-    SmartEdgeDevice(const std::string& fog, const std::string& cloud, double load)
-        : fog_name(fog), cloud_name(cloud), workload(load) {}
+    SmartEdgeDevice(const std::string& fog, const std::string& cloud, double load, int tasks = 1)
+        : fog_name(fog), cloud_name(cloud), workload(load), num_tasks(tasks) {}
     
     void operator()() {
         sg4::Host* this_host = sg4::this_actor::get_host();
-        XBT_INFO("Edge Device '%s' started (load: %.2f GFlops)",
-                 this_host->get_cname(), workload / 1e9);
+        std::string result_mailbox_name = std::string(this_host->get_cname()) + "_result";
+        
+        XBT_INFO("Edge Device '%s' started (load: %.2f GFlops, tasks: %d)",
+                 this_host->get_cname(), workload / 1e9, num_tasks);
         
         double device_capacity = this_host->get_speed();
         
-        // Offloading decision based on capacity
-        if (workload < device_capacity * 0.5) {
-            // Local processing - low load
-            XBT_INFO("Decision: LOCAL PROCESSING (low load)");
-            sg4::this_actor::execute(workload);
-            XBT_INFO("Local processing completed in %.2f seconds",
-                     sg4::Engine::get_clock());
+        // Process multiple tasks
+        for (int task_id = 0; task_id < num_tasks; task_id++) {
+            XBT_INFO("--- Processing task %d/%d ---", task_id + 1, num_tasks);
             
-        } else if (workload < device_capacity * 2.0) {
-            // Offload to Fog - medium load
-            XBT_INFO("Decision: OFFLOAD TO FOG (medium load)");
+            // Offloading decision based on capacity
+            if (workload < device_capacity * 0.5) {
+                // Local processing - low load
+                XBT_INFO("Decision: LOCAL PROCESSING (low load)");
+                double start_time = sg4::Engine::get_clock();
+                sg4::this_actor::execute(workload);
+                double end_time = sg4::Engine::get_clock();
+                XBT_INFO("Local processing completed in %.2f seconds",
+                         end_time - start_time);
+                
+            } else if (workload < device_capacity * 2.0) {
+                // Offload to Fog - medium load
+                XBT_INFO("Decision: OFFLOAD TO FOG (medium load)");
+                
+                auto* mbox = sg4::Mailbox::by_name(fog_name);
+                
+                // Create task payload with source info
+                auto* task_data = new std::pair<double, std::string>(workload, result_mailbox_name);
+                
+                XBT_INFO("Sending task to Fog '%s' (%.2f MFlops)...",
+                         fog_name.c_str(), workload / 1e6);
+                mbox->put(task_data, workload / 1e3);  // Data size = workload/1000
+                
+                // Wait for result
+                auto* result_mbox = sg4::Mailbox::by_name(result_mailbox_name);
+                auto* result = result_mbox->get<std::string>();
+                XBT_INFO("Result received from Fog: %s", result->c_str());
+                delete result;
+                
+            } else {
+                // Offload to Cloud - high load
+                XBT_INFO("Decision: OFFLOAD TO CLOUD (high load)");
+                
+                auto* mbox = sg4::Mailbox::by_name(cloud_name);
+                
+                // Create task payload with source info
+                auto* task_data = new std::pair<double, std::string>(workload, result_mailbox_name);
+                
+                XBT_INFO("Sending task to Cloud '%s' (%.2f MFlops)...",
+                         cloud_name.c_str(), workload / 1e6);
+                mbox->put(task_data, workload / 1e3);
+                
+                // Wait for result
+                auto* result_mbox = sg4::Mailbox::by_name(result_mailbox_name);
+                auto* result = result_mbox->get<std::string>();
+                XBT_INFO("Result received from Cloud: %s", result->c_str());
+                delete result;
+            }
             
-            auto* mbox = sg4::Mailbox::by_name(fog_name);
-            auto* task = new double(workload);
-            
-            XBT_INFO("Sending task to Fog '%s' (%.2f MFlops)...",
-                     fog_name.c_str(), workload / 1e6);
-            mbox->put(task, workload / 1e3);  // Data size = workload/1000
-            
-            // Wait for result
-            auto* result_mbox = sg4::Mailbox::by_name(
-                std::string(this_host->get_cname()) + "_result");
-            auto* result = result_mbox->get<std::string>();
-            XBT_INFO("Result received from Fog: %s", result->c_str());
-            delete result;
-            
-        } else {
-            // Offload to Cloud - high load
-            XBT_INFO("Decision: OFFLOAD TO CLOUD (high load)");
-            
-            auto* mbox = sg4::Mailbox::by_name(cloud_name);
-            auto* task = new double(workload);
-            
-            XBT_INFO("Sending task to Cloud '%s' (%.2f MFlops)...",
-                     cloud_name.c_str(), workload / 1e6);
-            mbox->put(task, workload / 1e3);
-            
-            // Wait for result
-            auto* result_mbox = sg4::Mailbox::by_name(
-                std::string(this_host->get_cname()) + "_result");
-            auto* result = result_mbox->get<std::string>();
-            XBT_INFO("Result received from Cloud: %s", result->c_str());
-            delete result;
+            // Small delay between tasks
+            if (task_id < num_tasks - 1) {
+                sg4::this_actor::sleep_for(0.5);
+            }
         }
         
-        XBT_INFO("Task completed successfully");
+        XBT_INFO("All %d tasks completed successfully", num_tasks);
     }
 };
 
 class OffloadingServer {
     std::string type;
+    int max_tasks;
     
 public:
-    OffloadingServer(const std::string& server_type) : type(server_type) {}
+    OffloadingServer(const std::string& server_type, int max = -1) 
+        : type(server_type), max_tasks(max) {}
     
     void operator()() {
         sg4::Host* this_host = sg4::this_actor::get_host();
@@ -90,35 +109,54 @@ public:
                  type.c_str(), this_host->get_cname());
         
         auto* mbox = sg4::Mailbox::by_name(this_host->get_cname());
+        int tasks_processed = 0;
         
-        // Server always listening
-        while (true) {
+        // Server listening for tasks
+        while (max_tasks < 0 || tasks_processed < max_tasks) {
             try {
-                auto* task = mbox->get<double>(10.0);  // Timeout 10s
+                // Receive task with source mailbox info
+                auto* task_data = mbox->get<std::pair<double, std::string>>(10.0);  // Timeout 10s
                 
-                XBT_INFO("[%s] Task received: %.2f MFlops", type.c_str(), *task / 1e6);
+                double workload = task_data->first;
+                std::string reply_to = task_data->second;
+                
+                XBT_INFO("[%s] Task received: %.2f MFlops (reply to: %s)", 
+                         type.c_str(), workload / 1e6, reply_to.c_str());
                 
                 // Process task
                 double start_time = sg4::Engine::get_clock();
-                sg4::this_actor::execute(*task);
+                sg4::this_actor::execute(workload);
                 double end_time = sg4::Engine::get_clock();
                 
                 XBT_INFO("[%s] Task processed in %.2f seconds",
                          type.c_str(), end_time - start_time);
                 
-                delete task;
+                tasks_processed++;
+                delete task_data;
                 
-                // Note: In a complete implementation, here we would send the result
-                // back to the device that requested it
+                // Send result back to the requesting device
+                auto* result_mbox = sg4::Mailbox::by_name(reply_to);
+                auto* result = new std::string(
+                    type + " processed task in " + 
+                    std::to_string(end_time - start_time) + "s");
+                
+                result_mbox->put(result, 100);  // Small result message
+                XBT_INFO("[%s] Result sent back to %s", type.c_str(), reply_to.c_str());
                 
             } catch (const simgrid::TimeoutException&) {
                 // Timeout - no more tasks
-                XBT_INFO("[%s] No more tasks, finishing", type.c_str());
+                XBT_INFO("[%s] No more tasks, finishing (processed %d tasks)", 
+                         type.c_str(), tasks_processed);
                 break;
             }
         }
         
-        XBT_INFO("[%s] Server finished", type.c_str());
+        if (max_tasks > 0 && tasks_processed >= max_tasks) {
+            XBT_INFO("[%s] Maximum tasks reached (%d), server finishing", 
+                     type.c_str(), tasks_processed);
+        }
+        
+        XBT_INFO("[%s] Server finished (total tasks: %d)", type.c_str(), tasks_processed);
     }
 };
 
@@ -126,9 +164,20 @@ int main(int argc, char* argv[]) {
     sg4::Engine e(&argc, argv);
     
     if (argc < 2) {
-        XBT_CRITICAL("Usage: %s <platform_file.xml>", argv[0]);
-        XBT_CRITICAL("Example: %s platforms/hybrid_platform.xml", argv[0]);
+        XBT_CRITICAL("Usage: %s <platform_file.xml> [num_tasks_per_device]", argv[0]);
+        XBT_CRITICAL("Example: %s platforms/hybrid_platform.xml 3", argv[0]);
+        XBT_CRITICAL("  - num_tasks_per_device: Number of tasks each edge device will send (default: 1)");
         return 1;
+    }
+    
+    // Parse number of tasks per device (optional parameter)
+    int num_tasks_per_device = 10;
+    if (argc >= 3) {
+        num_tasks_per_device = std::atoi(argv[2]);
+        if (num_tasks_per_device < 1) {
+            XBT_CRITICAL("num_tasks_per_device must be >= 1");
+            return 1;
+        }
     }
     
     e.load_platform(argv[1]);
@@ -142,6 +191,7 @@ int main(int argc, char* argv[]) {
     
     XBT_INFO("=== Data Offloading Application ===");
     XBT_INFO("Platform loaded with %zu hosts", hosts.size());
+    XBT_INFO("Tasks per edge device: %d", num_tasks_per_device);
     
     // Classify hosts
     std::vector<sg4::Host*> edge_hosts, fog_hosts, cloud_hosts;
@@ -174,14 +224,27 @@ int main(int argc, char* argv[]) {
     XBT_INFO("  Fog nodes: %zu", fog_hosts.size());
     XBT_INFO("  Cloud servers: %zu", cloud_hosts.size());
     
-    // Create Fog servers
-    for (auto* fog : fog_hosts) {
-        fog->add_actor("fog_server", OffloadingServer("FOG"));
+    // Calculate expected total tasks for servers
+    int expected_offloaded_tasks = 0;
+    for (size_t i = 0; i < edge_hosts.size(); i++) {
+        double workload = 1e9 * (0.5 + i * 0.5);
+        double device_capacity = edge_hosts[i]->get_speed();
+        // Only count tasks that will be offloaded
+        if (workload >= device_capacity * 0.5) {
+            expected_offloaded_tasks += num_tasks_per_device;
+        }
     }
     
-    // Create Cloud servers
+    XBT_INFO("  Expected offloaded tasks: %d", expected_offloaded_tasks);
+    
+    // Create Fog servers (with task limit based on expected load)
+    for (auto* fog : fog_hosts) {
+        fog->add_actor("fog_server", OffloadingServer("FOG", -1));  // -1 = unlimited
+    }
+    
+    // Create Cloud servers (with task limit based on expected load)
     for (auto* cloud : cloud_hosts) {
-        cloud->add_actor("cloud_server", OffloadingServer("CLOUD"));
+        cloud->add_actor("cloud_server", OffloadingServer("CLOUD", -1));  // -1 = unlimited
     }
     
     // Create Edge devices with different loads
@@ -193,7 +256,7 @@ int main(int argc, char* argv[]) {
         std::string cloud_name = cloud_hosts[i % cloud_hosts.size()]->get_cname();
         
         edge_hosts[i]->add_actor("smart_device_" + std::to_string(i),
-                                 SmartEdgeDevice(fog_name, cloud_name, workload));
+                                 SmartEdgeDevice(fog_name, cloud_name, workload, num_tasks_per_device));
     }
     
     // Run simulation
