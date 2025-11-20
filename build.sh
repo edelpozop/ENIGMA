@@ -43,7 +43,7 @@ if [ "$SIMGRID_FOUND" = false ]; then
     echo ""
     echo "   Installation options:"
     echo "   1. Via package manager: sudo apt install simgrid"
-    echo "   2. Manual installation in /opt/simgrid"
+    echo "   2. Manual installation in /opt/simgrid-4.1"
     echo "   3. Build from source: https://simgrid.org"
     echo ""
     read -p "Continue anyway? (y/N): " -n 1 -r

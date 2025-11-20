@@ -74,6 +74,15 @@ add_library(enigma_platform STATIC
 
 target_link_libraries(enigma_platform ${SimGrid_LIBRARY})
 
+# MQTT library
+add_library(enigma_mqtt STATIC
+    src/mqtt/MQTTBroker.cpp
+    src/mqtt/MQTTPublisher.cpp
+    src/mqtt/MQTTSubscriber.cpp
+)
+
+target_link_libraries(enigma_mqtt ${SimGrid_LIBRARY})
+
 # Platform generator (standalone tool)
 add_executable(platform_generator
     src/tools/platform_generator_main.cpp
@@ -85,22 +94,28 @@ target_link_libraries(platform_generator enigma_platform ${SimGrid_LIBRARY})
 add_executable(edge_computing_app
     src/apps/edge_computing.cpp
 )
-target_link_libraries(edge_computing_app enigma_platform ${SimGrid_LIBRARY})
+target_link_libraries(edge_computing_app enigma_platform enigma_mqtt ${SimGrid_LIBRARY})
 
 add_executable(fog_analytics_app
     src/apps/fog_analytics.cpp
 )
-target_link_libraries(fog_analytics_app enigma_platform ${SimGrid_LIBRARY})
+target_link_libraries(fog_analytics_app enigma_platform enigma_mqtt ${SimGrid_LIBRARY})
 
 add_executable(hybrid_cloud_app
     src/apps/hybrid_cloud.cpp
 )
-target_link_libraries(hybrid_cloud_app enigma_platform ${SimGrid_LIBRARY})
+target_link_libraries(hybrid_cloud_app enigma_platform enigma_mqtt ${SimGrid_LIBRARY})
 
 add_executable(data_offloading_app
     src/apps/data_offloading.cpp
 )
-target_link_libraries(data_offloading_app enigma_platform ${SimGrid_LIBRARY})
+target_link_libraries(data_offloading_app enigma_platform enigma_mqtt ${SimGrid_LIBRARY})
+
+# MQTT Example Application
+add_executable(mqtt_edge_app
+    src/apps/mqtt_edge_app.cpp
+)
+target_link_libraries(mqtt_edge_app enigma_platform enigma_mqtt ${SimGrid_LIBRARY})
 
 # Example: generate all platforms
 add_executable(generate_all_platforms
@@ -117,9 +132,9 @@ file(MAKE_DIRECTORY ${CMAKE_SOURCE_DIR}/platforms)
 file(MAKE_DIRECTORY ${CMAKE_SOURCE_DIR}/deployments)
 
 # Installation
-install(TARGETS enigma_platform platform_generator
+install(TARGETS enigma_platform enigma_mqtt platform_generator
         edge_computing_app fog_analytics_app hybrid_cloud_app data_offloading_app
-        generate_all_platforms
+        mqtt_edge_app generate_all_platforms
         RUNTIME DESTINATION bin
         LIBRARY DESTINATION lib
         ARCHIVE DESTINATION lib)

@@ -10,6 +10,7 @@ A C++ project that enables creation of XML platforms for Edge, Fog, and Cloud in
 - 📊 **Multiple Topologies**: Support for Edge, Fog, Cloud, and hybrid architectures
 - ⚡ **SimGrid 4.1**: Complete integration with SimGrid for distributed systems simulation
 - ✅ **Native Cluster Support**: Production-ready single-level cluster platforms (edge-cluster, fog-cluster, cloud-cluster)
+- 📡 **MQTT Protocol**: Publish/Subscribe communication pattern for IoT and Edge devices (optional)
 - ⚠️ **Multi-Zone Hybrid**: Experimental multi-zone cluster platforms (under investigation - see [KNOWN_ISSUES.md](KNOWN_ISSUES.md))
 
 ## Requirements
@@ -98,12 +99,30 @@ int main(int argc, char* argv[]) {
 }
 ```
 
+### 3. Use MQTT (Optional)
+
+```cpp
+#include "mqtt/MQTT.hpp"
+
+void sensor_actor() {
+    MQTTPublisher pub("mqtt_broker");
+    pub.publish("sensors/temp", "25.5°C", 100);
+}
+
+void gateway_actor() {
+    MQTTSubscriber sub("mqtt_broker");
+    sub.subscribe("sensors/temp");
+    auto msg = sub.receive();
+}
+```
+
 ## Examples
 
 - **edge_computing**: Edge application with distributed processing
 - **fog_analytics**: Analytics system with Fog node
 - **hybrid_cloud**: Hybrid Edge-Fog-Cloud architecture
 - **data_offloading**: Data offloading example
+- **mqtt_edge_app**: MQTT publish/subscribe pattern for IoT/Edge ⭐ NEW
 
 ## 📁 Project Structure
 
@@ -111,10 +130,12 @@ int main(int argc, char* argv[]) {
 ENIGMA/
 ├── include/          # Public headers
 │   ├── platform/    # Edge, Fog, Cloud generators
+│   ├── mqtt/        # MQTT Broker, Publisher, Subscriber
 │   └── utils/       # XMLWriter
 ├── src/             # Implementations
-│   ├── apps/       # 4 example applications
+│   ├── apps/       # 5 example applications + MQTT example
 │   ├── platform/   # Generator implementations
+│   ├── mqtt/       # MQTT implementation
 │   ├── tools/      # CLI platform_generator
 │   └── utils/      # XMLWriter implementation
 ├── examples/        # Examples and templates
