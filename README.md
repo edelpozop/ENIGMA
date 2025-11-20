@@ -117,8 +117,6 @@ void gateway_actor() {
 }
 ```
 
-See [`MQTT_USAGE.md`](MQTT_USAGE.md) for complete documentation.
-
 ## Examples
 
 The `tests/` directory contains complete example applications:
@@ -128,8 +126,6 @@ The `tests/` directory contains complete example applications:
 - **hybrid_cloud**: Hybrid Edge-Fog-Cloud architecture
 - **data_offloading**: Smart offloading with request/response cycle
 - **mqtt_edge_app**: MQTT publish/subscribe pattern for IoT/Edge ⭐ NEW
-
-For detailed information, see [`tests/README.md`](tests/README.md).
 
 ## 📁 Detailed Project Structure
 
