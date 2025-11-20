@@ -11,7 +11,6 @@ A C++ project that enables creation of XML platforms for Edge, Fog, and Cloud in
 - ⚡ **SimGrid 4.1**: Complete integration with SimGrid for distributed systems simulation
 - ✅ **Native Cluster Support**: Production-ready single-level cluster platforms (edge-cluster, fog-cluster, cloud-cluster)
 - 📡 **MQTT Protocol**: Publish/Subscribe communication pattern for IoT and Edge devices (optional)
-- ⚠️ **Multi-Zone Hybrid**: Experimental multi-zone cluster platforms (under investigation - see [KNOWN_ISSUES.md](KNOWN_ISSUES.md))
 
 ## Requirements
 
