@@ -74,11 +74,11 @@ add_library(enigma_platform STATIC
 
 target_link_libraries(enigma_platform ${SimGrid_LIBRARY})
 
-# MQTT library
+# MQTT library (Communication module)
 add_library(enigma_mqtt STATIC
-    src/mqtt/MQTTBroker.cpp
-    src/mqtt/MQTTPublisher.cpp
-    src/mqtt/MQTTSubscriber.cpp
+    src/comms/mqtt/MQTTBroker.cpp
+    src/comms/mqtt/MQTTPublisher.cpp
+    src/comms/mqtt/MQTTSubscriber.cpp
 )
 
 target_link_libraries(enigma_mqtt ${SimGrid_LIBRARY})
@@ -90,38 +90,38 @@ add_executable(platform_generator
 
 target_link_libraries(platform_generator enigma_platform ${SimGrid_LIBRARY})
 
-# Example applications
+# Test applications (formerly example applications)
 add_executable(edge_computing_app
-    src/apps/edge_computing.cpp
+    tests/edge_computing.cpp
 )
 target_link_libraries(edge_computing_app enigma_platform enigma_mqtt ${SimGrid_LIBRARY})
 
 add_executable(fog_analytics_app
-    src/apps/fog_analytics.cpp
+    tests/fog_analytics.cpp
 )
 target_link_libraries(fog_analytics_app enigma_platform enigma_mqtt ${SimGrid_LIBRARY})
 
 add_executable(hybrid_cloud_app
-    src/apps/hybrid_cloud.cpp
+    tests/hybrid_cloud.cpp
 )
 target_link_libraries(hybrid_cloud_app enigma_platform enigma_mqtt ${SimGrid_LIBRARY})
 
 add_executable(data_offloading_app
-    src/apps/data_offloading.cpp
+    tests/data_offloading.cpp
 )
 target_link_libraries(data_offloading_app enigma_platform enigma_mqtt ${SimGrid_LIBRARY})
 
-# MQTT Example Application
+# MQTT Test Application
 add_executable(mqtt_edge_app
-    src/apps/mqtt_edge_app.cpp
+    tests/mqtt_edge_app.cpp
 )
 target_link_libraries(mqtt_edge_app enigma_platform enigma_mqtt ${SimGrid_LIBRARY})
 
 # Example: generate all platforms
-add_executable(generate_all_platforms
-    examples/generate_all_platforms.cpp
-)
-target_link_libraries(generate_all_platforms enigma_platform ${SimGrid_LIBRARY})
+#add_executable(generate_all_platforms
+#    examples/generate_all_platforms.cpp
+#)
+#target_link_libraries(generate_all_platforms enigma_platform ${SimGrid_LIBRARY})
 
 # Output directories
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
@@ -134,7 +134,7 @@ file(MAKE_DIRECTORY ${CMAKE_SOURCE_DIR}/deployments)
 # Installation
 install(TARGETS enigma_platform enigma_mqtt platform_generator
         edge_computing_app fog_analytics_app hybrid_cloud_app data_offloading_app
-        mqtt_edge_app generate_all_platforms
+        mqtt_edge_app
         RUNTIME DESTINATION bin
         LIBRARY DESTINATION lib
         ARCHIVE DESTINATION lib)

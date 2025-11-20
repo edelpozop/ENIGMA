@@ -1,4 +1,4 @@
-#include "mqtt/MQTTPublisher.hpp"
+#include "comms/mqtt/MQTTPublisher.hpp"
 
 XBT_LOG_NEW_DEFAULT_CATEGORY(mqtt_publisher, "MQTT Publisher");
 

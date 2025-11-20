@@ -50,16 +50,28 @@ make
 
 ```
 ENIGMA/
-├── src/
-│   ├── platform/          # Platform generators
-│   ├── builder/           # Builder pattern for platforms
-│   ├── apps/              # Example applications
-│   └── utils/             # Utilities
-├── include/               # Public headers
-├── platforms/             # Generated XML platforms
-├── deployments/           # Deployment files
-├── examples/              # Usage examples
-└── CMakeLists.txt
+├── include/                 # Public headers
+│   ├── platform/           # Platform generators (Edge, Fog, Cloud)
+│   ├── comms/              # Communication modules
+│   │   └── mqtt/           # MQTT headers (Broker, Publisher, Subscriber)
+│   └── utils/              # Utility headers (XMLWriter)
+├── src/                     # Implementation files
+│   ├── platform/           # Platform generator implementations
+│   ├── comms/              # Communication module implementations
+│   │   └── mqtt/           # MQTT implementation (Broker, Publisher, Subscriber)
+│   ├── tools/              # Command-line tools (platform_generator)
+│   └── utils/              # Utility implementations (XMLWriter)
+├── tests/                   # Test/Example applications
+│   ├── edge_computing.cpp  # Basic edge computing
+│   ├── fog_analytics.cpp   # Fog analytics
+│   ├── hybrid_cloud.cpp    # Multi-tier hybrid
+│   ├── data_offloading.cpp # Smart offloading decisions
+│   ├── mqtt_edge_app.cpp   # MQTT pub/sub example
+├── build/                   # Build artifacts (generated)
+├── CMakeLists.txt           # CMake configuration
+├── build.sh                 # Build script
+├── run_examples.sh          # Interactive examples runner
+└── README.md                
 ```
 
 ## Usage
@@ -101,7 +113,7 @@ int main(int argc, char* argv[]) {
 ### 3. Use MQTT (Optional)
 
 ```cpp
-#include "mqtt/MQTT.hpp"
+#include "comms/mqtt/MQTT.hpp"
 
 void sensor_actor() {
     MQTTPublisher pub("mqtt_broker");
@@ -115,30 +127,80 @@ void gateway_actor() {
 }
 ```
 
+See [`MQTT_USAGE.md`](MQTT_USAGE.md) for complete documentation.
+
 ## Examples
 
+The `tests/` directory contains complete example applications:
+
 - **edge_computing**: Edge application with distributed processing
-- **fog_analytics**: Analytics system with Fog node
+- **fog_analytics**: Analytics system with Fog nodes
 - **hybrid_cloud**: Hybrid Edge-Fog-Cloud architecture
-- **data_offloading**: Data offloading example
+- **data_offloading**: Smart offloading with request/response cycle
 - **mqtt_edge_app**: MQTT publish/subscribe pattern for IoT/Edge ⭐ NEW
 
-## 📁 Project Structure
+For detailed information, see [`tests/README.md`](tests/README.md).
+
+## 📁 Detailed Project Structure
 
 ```
 ENIGMA/
-├── include/          # Public headers
-│   ├── platform/    # Edge, Fog, Cloud generators
-│   ├── mqtt/        # MQTT Broker, Publisher, Subscriber
-│   └── utils/       # XMLWriter
-├── src/             # Implementations
-│   ├── apps/       # 5 example applications + MQTT example
-│   ├── platform/   # Generator implementations
-│   ├── mqtt/       # MQTT implementation
-│   ├── tools/      # CLI platform_generator
-│   └── utils/      # XMLWriter implementation
-├── examples/        # Examples and templates
-├── platforms/       # Generated XML platforms
-├── build.sh         # Build script
-└── run_examples.sh  # Interactive script
+├── include/                 # Public API headers
+│   ├── platform/           # Platform generation
+│   │   ├── PlatformGenerator.hpp
+│   │   ├── PlatformBuilder.hpp
+│   │   ├── EdgePlatform.hpp
+│   │   ├── FogPlatform.hpp
+│   │   └── CloudPlatform.hpp
+│   ├── comms/              # Communication protocols
+│   │   └── mqtt/           # MQTT module
+│   │       ├── MQTT.hpp           # Convenience header
+│   │       ├── MQTTBroker.hpp     # Broker component
+│   │       ├── MQTTPublisher.hpp  # Publisher client
+│   │       └── MQTTSubscriber.hpp # Subscriber client
+│   └── utils/              # Utilities
+│       └── XMLWriter.hpp
+│
+├── src/                     # Implementation files
+│   ├── platform/           # Platform implementations
+│   │   ├── PlatformGenerator.cpp
+│   │   ├── PlatformBuilder.cpp
+│   │   ├── EdgePlatform.cpp
+│   │   ├── FogPlatform.cpp
+│   │   └── CloudPlatform.cpp
+│   ├── comms/              # Communication implementations
+│   │   └── mqtt/           # MQTT implementation
+│   │       ├── MQTTBroker.cpp
+│   │       ├── MQTTPublisher.cpp
+│   │       └── MQTTSubscriber.cpp
+│   ├── tools/              # CLI tools
+│   │   └── platform_generator_main.cpp
+│   └── utils/              # Utility implementations
+│       └── XMLWriter.cpp
+│
+├── tests/                   # Test applications (5 apps)
+│   ├── edge_computing.cpp  # Edge-only processing
+│   ├── fog_analytics.cpp   # Fog layer analytics
+│   ├── hybrid_cloud.cpp    # Multi-tier application
+│   ├── data_offloading.cpp # Smart offloading with responses
+│   ├── mqtt_edge_app.cpp   # MQTT pub/sub IoT example
+│   └── README.md           # Test apps documentation
+│
+├── examples/                # Code examples and templates
+│   └── generate_all_platforms.cpp
+│
+├── platforms/               # Generated XML platforms
+├── deployments/             # Deployment configurations
+├── build/                   # Build output directory
+│
+├── CMakeLists.txt           # Main build configuration
+├── build.sh                 # Quick build script
+├── run_examples.sh          # Interactive runner
+├── verify.sh                # Verification script
+│
+├── QUICKSTART.md            # Quick start guide
+├── CLUSTER_USAGE.md         # Cluster generation guide
+├── MQTT_USAGE.md            # MQTT module documentation
+├── MQTT_BROKER_PLACEMENT.md # MQTT best practices
+└── README.md                # This file
 ```

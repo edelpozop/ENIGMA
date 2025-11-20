@@ -1,4 +1,4 @@
-#include "mqtt/MQTTSubscriber.hpp"
+#include "comms/mqtt/MQTTSubscriber.hpp"
 
 XBT_LOG_NEW_DEFAULT_CATEGORY(mqtt_subscriber, "MQTT Subscriber");
 

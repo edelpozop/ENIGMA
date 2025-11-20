@@ -11,9 +11,9 @@
  * - MQTTSubscriber: Subscribe and receive messages
  */
 
-#include "mqtt/MQTTBroker.hpp"
-#include "mqtt/MQTTPublisher.hpp"
-#include "mqtt/MQTTSubscriber.hpp"
+#include "comms/mqtt/MQTTBroker.hpp"
+#include "comms/mqtt/MQTTPublisher.hpp"
+#include "comms/mqtt/MQTTSubscriber.hpp"
 
 namespace enigma {
 namespace mqtt {
