@@ -125,7 +125,7 @@ The `tests/` directory contains complete example applications:
 - **fog_analytics**: Analytics system with Fog nodes
 - **hybrid_cloud**: Hybrid Edge-Fog-Cloud architecture
 - **data_offloading**: Smart offloading with request/response cycle
-- **mqtt_edge_app**: MQTT publish/subscribe pattern for IoT/Edge ⭐ NEW
+- **mqtt_edge_app**: MQTT publish/subscribe pattern for IoT/Edge
 
 ## 📁 Detailed Project Structure
 
