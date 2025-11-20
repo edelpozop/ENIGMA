@@ -2,16 +2,6 @@
 
 A C++ project that enables creation of XML platforms for Edge, Fog, and Cloud infrastructures, with applications using SimGrid 4.1 for simulation.
 
-## Features
-
-- 🏗️ **XML Platform Generator**: Creates SimGrid platforms with Edge, Fog, and Cloud topologies
-- 🔧 **Builder Pattern**: Fluent API to configure hosts, links, zones, and clusters
-- 🚀 **Example Applications**: Distributed application examples using SimGrid
-- 📊 **Multiple Topologies**: Support for Edge, Fog, Cloud, and hybrid architectures
-- ⚡ **SimGrid 4.1**: Complete integration with SimGrid for distributed systems simulation
-- ✅ **Native Cluster Support**: Production-ready single-level cluster platforms (edge-cluster, fog-cluster, cloud-cluster)
-- 📡 **MQTT Protocol**: Publish/Subscribe communication pattern for IoT and Edge devices (optional)
-
 ## Requirements
 
 - C++17 or higher
@@ -184,10 +174,6 @@ ENIGMA/
 │   ├── hybrid_cloud.cpp    # Multi-tier application
 │   ├── data_offloading.cpp # Smart offloading with responses
 │   ├── mqtt_edge_app.cpp   # MQTT pub/sub IoT example
-│   └── README.md           # Test apps documentation
-│
-├── examples/                # Code examples and templates
-│   └── generate_all_platforms.cpp
 │
 ├── platforms/               # Generated XML platforms
 ├── deployments/             # Deployment configurations
@@ -200,7 +186,5 @@ ENIGMA/
 │
 ├── QUICKSTART.md            # Quick start guide
 ├── CLUSTER_USAGE.md         # Cluster generation guide
-├── MQTT_USAGE.md            # MQTT module documentation
-├── MQTT_BROKER_PLACEMENT.md # MQTT best practices
-└── README.md                # This file
+└── README.md                
 ```
