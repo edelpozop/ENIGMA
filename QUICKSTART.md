@@ -1,7 +1,5 @@
 # ENIGMA Platform Generator - Quick Start Guide
 
-## 🚀 Get Started in 5 Minutes
-
 ### Step 1: Install Dependencies
 
 ```bash
@@ -16,7 +14,7 @@ simgrid_version
 ### Step 2: Build Project
 
 ```bash
-cd /home/elias/VSProjects/ENIGMA
+cd $PATH_TO_ENIGMA/ENIGMA
 chmod +x build.sh
 ./build.sh
 ```
@@ -25,7 +23,7 @@ chmod +x build.sh
 
 ```bash
 # Create hybrid Edge-Fog-Cloud platform
-./build/bin/platform_generator hybrid 10 5 3
+./build/platform_generator hybrid 10 5 3
 ```
 
 Creates `platforms/hybrid_platform.xml` with 10 Edge devices, 5 Fog nodes, 3 Cloud servers.
@@ -33,32 +31,32 @@ Creates `platforms/hybrid_platform.xml` with 10 Edge devices, 5 Fog nodes, 3 Clo
 ### Step 4: Run Application
 
 ```bash
-./build/bin/hybrid_cloud_app platforms/hybrid_platform.xml
+./build/hybrid_cloud_app platforms/hybrid_platform.xml
 ```
 
 ## 📝 Platform Generation Examples
 
 ```bash
 # Edge platform
-./build/bin/platform_generator edge 10
+./build/platform_generator edge 10
 
 # Fog platform
-./build/bin/platform_generator fog 5
+./build/platform_generator fog 5
 
 # Cloud platform
-./build/bin/platform_generator cloud 20
+./build/platform_generator cloud 20
 
 # IoT platform
-./build/bin/platform_generator iot 30 10
+./build/platform_generator iot 30 10
 ```
 
 ## 🚀 Run Applications
 
 ```bash
-./build/bin/edge_computing_app platforms/edge_platform.xml
-./build/bin/fog_analytics_app platforms/fog_platform.xml
-./build/bin/hybrid_cloud_app platforms/hybrid_platform.xml
-./build/bin/data_offloading_app platforms/hybrid_platform.xml
+./build/edge_computing_app platforms/edge_platform.xml
+./build/fog_analytics_app platforms/fog_platform.xml
+./build/hybrid_cloud_app platforms/hybrid_platform.xml
+./build/data_offloading_app platforms/hybrid_platform.xml
 ```
 
 ## 🛠️ Create Your Own Application
@@ -111,22 +109,8 @@ int main() {
 
 ## ❓ Troubleshooting
 
-### SimGrid not found
-```bash
-pkg-config --modversion simgrid
-sudo apt-get install simgrid libsimgrid-dev
-```
-
 ### Build error
 ```bash
 rm -rf build
 ./build.sh
 ```
-
-## 🎓 Next Steps
-
-1. Read `USAGE.md` for detailed guide
-2. Explore `examples/` directory
-3. Check SimGrid docs: https://simgrid.org
-
-**Happy simulating!** 🎉

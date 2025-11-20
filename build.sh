@@ -38,7 +38,7 @@ elif [ -d "/opt/lib/libsimgrid.so" ] || [ -d "/opt/include/simgrid" ]; then
 fi
 
 if [ "$SIMGRID_FOUND" = false ]; then
-    echo "⚠️  Warning: SimGrid not detected"
+    echo "Warning: SimGrid not detected"
     echo "   Make sure SimGrid 4.1+ is installed"
     echo ""
     echo "   Installation options:"
@@ -77,18 +77,18 @@ else
 fi
 
 if [ $? -ne 0 ]; then
-    echo "❌ Error in CMake configuration"
+    echo "Error in CMake configuration"
     exit 1
 fi
 
 make -j$(nproc)
 if [ $? -ne 0 ]; then
-    echo "❌ Error in compilation"
+    echo "Error in compilation"
     exit 1
 fi
 
 echo ""
-echo "✅ Build successful!"
+echo "Build successful!"
 echo ""
 echo "Generated executables in: build/"
 echo "  - platform_generator    : Platform generator"

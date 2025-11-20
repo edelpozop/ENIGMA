@@ -32,7 +32,7 @@ sudo apt-get install simgrid libsimgrid-dev
 git clone https://github.com/simgrid/simgrid.git
 cd simgrid
 mkdir build && cd build
-cmake -DCMAKE_INSTALL_PREFIX=/usr/local ..
+cmake -DCMAKE_INSTALL_PREFIX=/opt/simgrid-4.1 ..
 make -j$(nproc)
 sudo make install
 ```

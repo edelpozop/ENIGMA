@@ -51,26 +51,13 @@ Example:
 ./build/hybrid_cloud_app ./platforms/hybrid_platform.xml
 ```
 
-**Benefits**:
-- ✅ 2-level hierarchy (simpler, more reliable)
-- ✅ Direct inter-cluster routing
-- ✅ Works with all SimGrid versions
-- ✅ Tested with complex scenarios
-
-#### Option 2: 3-Level Hierarchy ⚠️ EXPERIMENTAL
+#### Option 2: 3-Level Hierarchy
 
 **Status: EXPERIMENTAL** - May have routing issues in SimGrid 4.1
 
 ```bash
 ./build/platform_generator hybrid-cluster 2 10 2 5 1 20
 ```
-
-**Limitations**:
-- ⚠️ May encounter segmentation faults with some SimGrid versions
-- ⚠️ Requires testing before production use
-- ⚠️ Use flat hierarchy for production environments
-
-See [KNOWN_ISSUES.md](KNOWN_ISSUES.md) for details.
 
 ## Implementation Details
 
@@ -178,16 +165,6 @@ Example test with edge computing app:
 Expected result:
 - Platform loads with 15 hosts (3 clusters × 5 nodes)
 - All devices can communicate across clusters via routers
-- Simulation completes successfully
-- Simulated time: ~9.79 seconds
-
-## Benefits of Native Clusters
-
-1. **Performance**: SimGrid optimizes cluster routing internally
-2. **Scalability**: Handles large numbers of nodes efficiently
-3. **Compact XML**: Uses radical notation (0-N) instead of listing each host
-4. **Built-in Topology**: SimGrid clusters have optimized internal routing
-5. **Realistic Modeling**: Mirrors real HPC cluster architectures
 
 ## Comparison: Simple vs Cluster-Based
 
@@ -208,38 +185,3 @@ Generates: 3 clusters of 5 nodes each (15 total hosts)
 - Compact cluster definitions
 - Hierarchical routing (intra-cluster + inter-cluster)
 - Smaller, more maintainable XML
-
-**Benefits of Cluster Syntax:**
-- Logical organization of hosts
-- Easier to understand platform structure
-- Scales better for large deployments
-- More realistic for distributed systems
-- Better performance with SimGrid's cluster optimizations
-
-## Advanced Usage
-
-### Customizing Cluster Behavior
-
-The default behavior uses `use_native_clusters = true`. This can be modified in code:
-
-```cpp
-ZoneConfig zone("my_platform", "Full");
-zone.use_native_clusters = true;  // Use native <cluster> tags (default)
-// or
-zone.use_native_clusters = false; // Expand to individual hosts
-```
-
-## Limitations
-
-1. **Multi-Zone Routing**: Cross-zone communication in hybrid platforms requires additional configuration (currently experimental)
-2. **Fixed Specifications**: Cluster specifications use default values (future enhancement: customizable per cluster)
-3. **Gateway Requirement**: Each cluster zone requires a router gateway for inter-cluster communication
-
-## Future Enhancements
-
-- [ ] Custom cluster specifications (bandwidth, latency, cores) per cluster
-- [ ] Heterogeneous clusters (mixed node types within a cluster)
-- [ ] Advanced topologies (torus, fat-tree) for clusters
-- [ ] Cluster templates (pre-defined cluster types)
-- [ ] Hierarchical multi-level hybrid platforms with proper zone gateways
-- [ ] Support for cluster sharing policies (SHARED, FATPIPE, SPLITDUPLEX)
