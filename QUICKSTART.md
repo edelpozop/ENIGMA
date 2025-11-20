@@ -1,0 +1,132 @@
+# ENIGMA Platform Generator - Quick Start Guide
+
+## 🚀 Get Started in 5 Minutes
+
+### Step 1: Install Dependencies
+
+```bash
+# Ubuntu/Debian
+sudo apt-get update
+sudo apt-get install -y simgrid libsimgrid-dev cmake build-essential
+
+# Verify
+simgrid_version
+```
+
+### Step 2: Build Project
+
+```bash
+cd /home/elias/VSProjects/ENIGMA
+chmod +x build.sh
+./build.sh
+```
+
+### Step 3: Generate Your First Platform
+
+```bash
+# Create hybrid Edge-Fog-Cloud platform
+./build/bin/platform_generator hybrid 10 5 3
+```
+
+Creates `platforms/hybrid_platform.xml` with 10 Edge devices, 5 Fog nodes, 3 Cloud servers.
+
+### Step 4: Run Application
+
+```bash
+./build/bin/hybrid_cloud_app platforms/hybrid_platform.xml
+```
+
+## 📝 Platform Generation Examples
+
+```bash
+# Edge platform
+./build/bin/platform_generator edge 10
+
+# Fog platform
+./build/bin/platform_generator fog 5
+
+# Cloud platform
+./build/bin/platform_generator cloud 20
+
+# IoT platform
+./build/bin/platform_generator iot 30 10
+```
+
+## 🚀 Run Applications
+
+```bash
+./build/bin/edge_computing_app platforms/edge_platform.xml
+./build/bin/fog_analytics_app platforms/fog_platform.xml
+./build/bin/hybrid_cloud_app platforms/hybrid_platform.xml
+./build/bin/data_offloading_app platforms/hybrid_platform.xml
+```
+
+## 🛠️ Create Your Own Application
+
+```cpp
+#include <simgrid/s4u.hpp>
+
+XBT_LOG_NEW_DEFAULT_CATEGORY(my_app, "My Application");
+
+class MyWorker {
+public:
+    void operator()() {
+        auto* host = simgrid::s4u::this_actor::get_host();
+        XBT_INFO("Worker on %s", host->get_cname());
+        simgrid::s4u::this_actor::execute(1e9); // 1 GFlop
+        XBT_INFO("Work completed");
+    }
+};
+
+int main(int argc, char* argv[]) {
+    simgrid::s4u::Engine e(&argc, argv);
+    if (argc < 2) {
+        XBT_CRITICAL("Usage: %s <platform.xml>", argv[0]);
+        return 1;
+    }
+    e.load_platform(argv[1]);
+    for (auto* host : e.get_all_hosts()) {
+        simgrid::s4u::Actor::create("worker", host, MyWorker());
+    }
+    e.run();
+    return 0;
+}
+```
+
+## 🎯 Create Platform Programmatically
+
+```cpp
+#include "platform/PlatformBuilder.hpp"
+
+int main() {
+    enigma::PlatformBuilder builder;
+    builder.createEdgeFogCloud("custom")
+           .addEdgeLayer(15, "2Gf", "200MBps")
+           .addFogLayer(8, "15Gf", "2GBps")
+           .addCloudLayer(5, "150Gf", "20GBps")
+           .build();
+    return 0;
+}
+```
+
+## ❓ Troubleshooting
+
+### SimGrid not found
+```bash
+pkg-config --modversion simgrid
+sudo apt-get install simgrid libsimgrid-dev
+```
+
+### Build error
+```bash
+rm -rf build
+./build.sh
+```
+
+## 🎓 Next Steps
+
+1. Read `USAGE.md` for detailed guide
+2. Explore `examples/` directory
+3. Check SimGrid docs: https://simgrid.org
+
+**Happy simulating!** 🎉

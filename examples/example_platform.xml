@@ -1,0 +1,67 @@
+<?xml version='1.0'?>
+<!DOCTYPE platform SYSTEM "https://simgrid.org/simgrid.dtd">
+<!-- Plataforma de ejemplo simple Edge-Fog-Cloud -->
+<zone id="example_platform" routing="Full">
+  <!-- Comentario: Esta es una plataforma de ejemplo simple -->
+  
+  <!-- Dispositivos Edge -->
+  <host id="edge_device_0" speed="1Gf" core="1"/>
+  <host id="edge_device_1" speed="1Gf" core="1"/>
+  <host id="edge_gateway" speed="5Gf" core="2"/>
+  
+  <!-- Nodo Fog -->
+  <host id="fog_node_0" speed="10Gf" core="8"/>
+  
+  <!-- Servidor Cloud -->
+  <host id="cloud_server_0" speed="100Gf" core="32"/>
+  
+  <!-- Enlaces -->
+  <link id="edge_link" bandwidth="125MBps" latency="10ms"/>
+  <link id="fog_link" bandwidth="1GBps" latency="5ms"/>
+  <link id="cloud_link" bandwidth="10GBps" latency="50ms"/>
+  
+  <!-- Rutas Edge -->
+  <route src="edge_device_0" dst="edge_gateway">
+    <link_ctn id="edge_link"/>
+  </route>
+  <route src="edge_device_1" dst="edge_gateway">
+    <link_ctn id="edge_link"/>
+  </route>
+  <route src="edge_device_0" dst="edge_device_1">
+    <link_ctn id="edge_link"/>
+  </route>
+  
+  <!-- Rutas Edge-Fog -->
+  <route src="edge_gateway" dst="fog_node_0">
+    <link_ctn id="fog_link"/>
+  </route>
+  <route src="edge_device_0" dst="fog_node_0">
+    <link_ctn id="edge_link"/>
+    <link_ctn id="fog_link"/>
+  </route>
+  <route src="edge_device_1" dst="fog_node_0">
+    <link_ctn id="edge_link"/>
+    <link_ctn id="fog_link"/>
+  </route>
+  
+  <!-- Rutas Fog-Cloud -->
+  <route src="fog_node_0" dst="cloud_server_0">
+    <link_ctn id="cloud_link"/>
+  </route>
+  
+  <!-- Rutas Edge-Cloud (a través de Fog) -->
+  <route src="edge_gateway" dst="cloud_server_0">
+    <link_ctn id="fog_link"/>
+    <link_ctn id="cloud_link"/>
+  </route>
+  <route src="edge_device_0" dst="cloud_server_0">
+    <link_ctn id="edge_link"/>
+    <link_ctn id="fog_link"/>
+    <link_ctn id="cloud_link"/>
+  </route>
+  <route src="edge_device_1" dst="cloud_server_0">
+    <link_ctn id="edge_link"/>
+    <link_ctn id="fog_link"/>
+    <link_ctn id="cloud_link"/>
+  </route>
+</zone>
