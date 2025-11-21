@@ -4,6 +4,7 @@
 #include "platform/CloudPlatform.hpp"
 #include <iostream>
 #include <string>
+#include <fstream>
 
 using namespace enigma;
 
@@ -19,13 +20,173 @@ void printUsage(const char* progName) {
     std::cout << "    edge-cluster <num_clusters> <nodes_per_cluster>  - Edge clusters\n";
     std::cout << "    fog-cluster <num_clusters> <nodes_per_cluster>   - Fog clusters\n";
     std::cout << "    cloud-cluster <num_clusters> <nodes_per_cluster> - Cloud clusters\n";
-    std::cout << "    hybrid-cluster <edge_clusters> <edge_nodes> <fog_clusters> <fog_nodes> <cloud_clusters> <cloud_nodes> [edge_cloud_direct] [output_file] - Flat hybrid (optional direct Edge-Cloud + optional output filename)\n";
+    std::cout << "    hybrid-cluster <edge_clusters> <edge_nodes> <fog_clusters> <fog_nodes> <cloud_clusters> <cloud_nodes> [edge_cloud_direct] [output_file] [--generate-app] - Flat hybrid (optional direct Edge-Cloud + optional output filename + optional app template)\n";
+    std::cout << "\nFlags:\n";
+    std::cout << "    --generate-app    Generate a C++ template application for the platform\n";
     std::cout << "\nExamples:\n";
     std::cout << "  Simple:\n";
     std::cout << "    " << progName << " edge 10\n";
     std::cout << "\n  Clusters:\n";
     std::cout << "    " << progName << " edge-cluster 3 5       # 3 edge clusters with 5 devices each\n";
-    std::cout << "    " << progName << " hybrid-cluster 2 10 2 5 1 20 1 custom_platform.xml  # Flat hybrid with direct Edge-Cloud links + custom file\n";
+    std::cout << "    " << progName << " hybrid-cluster 2 10 2 5 1 20 1 custom_platform.xml --generate-app  # With template app\n";
+}
+
+void generateTemplateApp(const std::string& appFilename, const std::string& platformFile,
+                         int edgeClusters, int edgeNodes, 
+                         int fogClusters, int fogNodes,
+                         int cloudClusters, int cloudNodes) {
+    std::ofstream appFile(appFilename);
+    if (!appFile.is_open()) {
+        std::cerr << "Error: Could not create template app file: " << appFilename << std::endl;
+        return;
+    }
+    
+    appFile << "#include <simgrid/s4u.hpp>\n";
+    appFile << "#include <iostream>\n";
+    appFile << "#include <string>\n\n";
+    appFile << "XBT_LOG_NEW_DEFAULT_CATEGORY(app_template, \"Application Template\");\n\n";
+    appFile << "namespace sg4 = simgrid::s4u;\n\n";
+    
+    // Generate Edge actor class if there are edge clusters
+    if (edgeClusters > 0) {
+        appFile << "/**\n";
+        appFile << " * @brief Edge device actor\n";
+        appFile << " * TODO: Implement your edge device logic here\n";
+        appFile << " */\n";
+        appFile << "class EdgeDevice {\n";
+        appFile << "public:\n";
+        appFile << "    void operator()() {\n";
+        appFile << "        sg4::Host* this_host = sg4::this_actor::get_host();\n";
+        appFile << "        XBT_INFO(\"[EDGE] Device '%s' started\", this_host->get_cname());\n";
+        appFile << "        \n";
+        appFile << "        // TODO: Add your edge processing logic here\n";
+        appFile << "        // Example: sense data, process locally, send to fog/cloud\n";
+        appFile << "        \n";
+        appFile << "        XBT_INFO(\"[EDGE] Device '%s' finished\", this_host->get_cname());\n";
+        appFile << "    }\n";
+        appFile << "};\n\n";
+    }
+    
+    // Generate Fog actor class if there are fog clusters
+    if (fogClusters > 0) {
+        appFile << "/**\n";
+        appFile << " * @brief Fog node actor\n";
+        appFile << " * TODO: Implement your fog node logic here\n";
+        appFile << " */\n";
+        appFile << "class FogNode {\n";
+        appFile << "public:\n";
+        appFile << "    void operator()() {\n";
+        appFile << "        sg4::Host* this_host = sg4::this_actor::get_host();\n";
+        appFile << "        XBT_INFO(\"[FOG] Node '%s' started\", this_host->get_cname());\n";
+        appFile << "        \n";
+        appFile << "        // TODO: Add your fog processing logic here\n";
+        appFile << "        // Example: receive from edge, aggregate, filter, forward to cloud\n";
+        appFile << "        \n";
+        appFile << "        XBT_INFO(\"[FOG] Node '%s' finished\", this_host->get_cname());\n";
+        appFile << "    }\n";
+        appFile << "};\n\n";
+    }
+    
+    // Generate Cloud actor class if there are cloud clusters
+    if (cloudClusters > 0) {
+        appFile << "/**\n";
+        appFile << " * @brief Cloud server actor\n";
+        appFile << " * TODO: Implement your cloud server logic here\n";
+        appFile << " */\n";
+        appFile << "class CloudServer {\n";
+        appFile << "public:\n";
+        appFile << "    void operator()() {\n";
+        appFile << "        sg4::Host* this_host = sg4::this_actor::get_host();\n";
+        appFile << "        XBT_INFO(\"[CLOUD] Server '%s' started\", this_host->get_cname());\n";
+        appFile << "        \n";
+        appFile << "        // TODO: Add your cloud processing logic here\n";
+        appFile << "        // Example: receive data, perform analytics, store results\n";
+        appFile << "        \n";
+        appFile << "        XBT_INFO(\"[CLOUD] Server '%s' finished\", this_host->get_cname());\n";
+        appFile << "    }\n";
+        appFile << "};\n\n";
+    }
+    
+    // Generate main function
+    appFile << "int main(int argc, char* argv[]) {\n";
+    appFile << "    sg4::Engine e(&argc, argv);\n";
+    appFile << "    \n";
+    appFile << "    if (argc < 2) {\n";
+    appFile << "        XBT_CRITICAL(\"Usage: %s <platform_file.xml>\", argv[0]);\n";
+    appFile << "        return 1;\n";
+    appFile << "    }\n";
+    appFile << "    \n";
+    appFile << "    e.load_platform(argv[1]);\n";
+    appFile << "    \n";
+    appFile << "    std::vector<sg4::Host*> hosts = e.get_all_hosts();\n";
+    appFile << "    XBT_INFO(\"=== Application Template ===\");\n";
+    appFile << "    XBT_INFO(\"Platform loaded with %zu hosts\", hosts.size());\n";
+    appFile << "    XBT_INFO(\"Configuration:\");\n";
+    appFile << "    XBT_INFO(\"  Edge clusters: " << edgeClusters << " × " << edgeNodes << " nodes\");\n";
+    appFile << "    XBT_INFO(\"  Fog clusters: " << fogClusters << " × " << fogNodes << " nodes\");\n";
+    appFile << "    XBT_INFO(\"  Cloud clusters: " << cloudClusters << " × " << cloudNodes << " nodes\");\n";
+    appFile << "    \n";
+    appFile << "    // Classify hosts by cluster type\n";
+    appFile << "    std::vector<sg4::Host*> edge_hosts, fog_hosts, cloud_hosts;\n";
+    appFile << "    \n";
+    appFile << "    for (auto* host : hosts) {\n";
+    appFile << "        std::string name = host->get_cname();\n";
+    appFile << "        if (name.find(\"edge\") != std::string::npos) {\n";
+    appFile << "            edge_hosts.push_back(host);\n";
+    appFile << "        } else if (name.find(\"fog\") != std::string::npos) {\n";
+    appFile << "            fog_hosts.push_back(host);\n";
+    appFile << "        } else if (name.find(\"cloud\") != std::string::npos) {\n";
+    appFile << "            cloud_hosts.push_back(host);\n";
+    appFile << "        }\n";
+    appFile << "    }\n";
+    appFile << "    \n";
+    appFile << "    XBT_INFO(\"Detected: %zu edge, %zu fog, %zu cloud hosts\", \n";
+    appFile << "             edge_hosts.size(), fog_hosts.size(), cloud_hosts.size());\n";
+    appFile << "    \n";
+    
+    // Deploy actors
+    if (edgeClusters > 0) {
+        appFile << "    // Deploy Edge devices\n";
+        appFile << "    for (auto* host : edge_hosts) {\n";
+        appFile << "        host->add_actor(\"edge_device\", EdgeDevice());\n";
+        appFile << "    }\n";
+        appFile << "    \n";
+    }
+    
+    if (fogClusters > 0) {
+        appFile << "    // Deploy Fog nodes\n";
+        appFile << "    for (auto* host : fog_hosts) {\n";
+        appFile << "        host->add_actor(\"fog_node\", FogNode());\n";
+        appFile << "    }\n";
+        appFile << "    \n";
+    }
+    
+    if (cloudClusters > 0) {
+        appFile << "    // Deploy Cloud servers\n";
+        appFile << "    for (auto* host : cloud_hosts) {\n";
+        appFile << "        host->add_actor(\"cloud_server\", CloudServer());\n";
+        appFile << "    }\n";
+        appFile << "    \n";
+    }
+    
+    appFile << "    // Run simulation\n";
+    appFile << "    e.run();\n";
+    appFile << "    \n";
+    appFile << "    XBT_INFO(\"=== Simulation completed ===\");\n";
+    appFile << "    XBT_INFO(\"Simulated time: %.2f seconds\", sg4::Engine::get_clock());\n";
+    appFile << "    \n";
+    appFile << "    return 0;\n";
+    appFile << "}\n";
+    
+    appFile.close();
+    std::cout << "Template application generated: " << appFilename << std::endl;
+    std::cout << "\nNext steps:\n";
+    std::cout << "  1. Edit " << appFilename << " and implement your actor logic\n";
+    std::cout << "  2. Add to CMakeLists.txt:\n";
+    std::cout << "     add_executable(my_app " << appFilename << ")\n";
+    std::cout << "     target_link_libraries(my_app enigma_platform ${SimGrid_LIBRARY})\n";
+    std::cout << "  3. Compile: cd build && cmake .. && make\n";
+    std::cout << "  4. Run: ./build/my_app " << platformFile << "\n";
 }
 
 int main(int argc, char* argv[]) {
@@ -138,21 +299,31 @@ int main(int argc, char* argv[]) {
             int cloudNodes = std::stoi(argv[7]);
             bool directEdgeCloud = false;
             std::string outputFile = "platforms/hybrid_platform.xml";
+            bool generateApp = false;
             int optionalIndex = 8;
-            if (argc > optionalIndex) {
-                // Try parse edge_cloud_direct as integer; if not numeric treat as filename
-                char* endPtr = nullptr;
-                long val = strtol(argv[optionalIndex], &endPtr, 10);
-                if (endPtr != nullptr && *endPtr == '\0') {
-                    directEdgeCloud = (val != 0);
+            
+            // Parse optional arguments
+            while (optionalIndex < argc) {
+                std::string arg = argv[optionalIndex];
+                if (arg == "--generate-app") {
+                    generateApp = true;
                     optionalIndex++;
-                }
-            }
-            if (argc > optionalIndex) {
-                outputFile = argv[optionalIndex];
-                // if user did not include path, ensure it goes to platforms/ by default
-                if (outputFile.find('/') == std::string::npos) {
-                    outputFile = std::string("platforms/") + outputFile;
+                } else {
+                    // Try parse as integer (edge_cloud_direct) or filename
+                    char* endPtr = nullptr;
+                    long val = strtol(argv[optionalIndex], &endPtr, 10);
+                    if (endPtr != nullptr && *endPtr == '\0') {
+                        // It's a number - edge_cloud_direct flag
+                        directEdgeCloud = (val != 0);
+                        optionalIndex++;
+                    } else {
+                        // It's a filename
+                        outputFile = argv[optionalIndex];
+                        if (outputFile.find('/') == std::string::npos) {
+                            outputFile = std::string("platforms/") + outputFile;
+                        }
+                        optionalIndex++;
+                    }
                 }
             }
             
@@ -162,6 +333,7 @@ int main(int argc, char* argv[]) {
             std::cout << "  - Cloud: " << cloudClusters << " clusters × " << cloudNodes << " nodes\n";
             std::cout << "  - Direct Edge-Cloud links: " << (directEdgeCloud ? "ENABLED" : "DISABLED") << "\n";
             std::cout << "  - Output file: " << outputFile << "\n";
+            std::cout << "  - Generate template app: " << (generateApp ? "YES" : "NO") << "\n";
             
             std::vector<ClusterConfig> edgeClustersVec, fogClustersVec, cloudClustersVec;
             
@@ -183,6 +355,21 @@ int main(int argc, char* argv[]) {
             auto zone = PlatformGenerator::createHybridWithClustersFlat(edgeClustersVec, fogClustersVec, cloudClustersVec, directEdgeCloud);
             PlatformGenerator gen;
             gen.generatePlatform(outputFile, zone);
+            
+            // Generate template app if requested
+            if (generateApp) {
+                std::string appFilename = outputFile;
+                // Replace .xml with .cpp and move to tests/
+                size_t lastSlash = appFilename.find_last_of('/');
+                size_t lastDot = appFilename.find_last_of('.');
+                std::string baseName = appFilename.substr(lastSlash + 1, lastDot - lastSlash - 1);
+                std::string appFile = "tests/" + baseName + "_app.cpp";
+                
+                generateTemplateApp(appFile, outputFile, 
+                                   edgeClusters, edgeNodes, 
+                                   fogClusters, fogNodes, 
+                                   cloudClusters, cloudNodes);
+            }
             
         } else {
             std::cerr << "Error: Invalid arguments\n\n";

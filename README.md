@@ -117,6 +117,96 @@ void gateway_actor() {
 }
 ```
 
+## Platform Generator Tool
+
+The `platform_generator` CLI tool allows you to quickly generate hybrid Edge-Fog-Cloud platforms:
+
+### Basic Usage
+
+```bash
+./build/platform_generator hybrid-cluster <eC> <eN> <fC> <fN> <cC> <cN>
+```
+
+Where:
+- `eC`: Number of Edge clusters
+- `eN`: Nodes per Edge cluster
+- `fC`: Number of Fog clusters
+- `fN`: Nodes per Fog cluster
+- `cC`: Number of Cloud clusters
+- `cN`: Nodes per Cloud cluster
+
+**Example:**
+```bash
+# Generate platform with 2 Edge clusters (5 nodes each), 1 Fog cluster (3 nodes), 1 Cloud cluster (10 nodes)
+./build/platform_generator hybrid-cluster 2 5 1 3 1 10
+```
+
+### Advanced Options
+
+#### Direct Edge-Cloud Connectivity
+
+Add `1` as the 7th parameter to enable direct Edge-to-Cloud links (bypassing Fog):
+
+```bash
+./build/platform_generator hybrid-cluster 2 5 1 3 1 10 1
+```
+
+This creates 2GBps/30ms links between Edge and Cloud clusters in addition to the normal Edge→Fog→Cloud topology.
+
+#### Custom Output Filename
+
+Specify a custom filename for the generated platform:
+
+```bash
+./build/platform_generator hybrid-cluster 2 5 1 3 1 10 1 my_custom_platform.xml
+```
+
+The tool automatically prepends `platforms/` if you don't specify a path.
+
+#### Generate Template Application
+
+Use the `--generate-app` flag to automatically create a C++ template application:
+
+```bash
+./build/platform_generator hybrid-cluster 2 5 1 3 1 10 1 my_platform.xml --generate-app
+```
+
+This generates:
+- **Platform XML**: `platforms/my_platform.xml`
+- **Template App**: `tests/my_platform_app.cpp`
+
+The template includes:
+- `EdgeDevice` class (if edge clusters > 0)
+- `FogNode` class (if fog clusters > 0)
+- `CloudServer` class (if cloud clusters > 0)
+- Actor deployment logic with host classification
+- TODO sections for implementing your custom logic
+
+**To use the generated template:**
+
+1. **Edit the template** and implement your logic in the TODO sections
+2. **Add to CMakeLists.txt**:
+   ```cmake
+   add_executable(my_platform_app tests/my_platform_app.cpp)
+   target_link_libraries(my_platform_app enigma_platform ${SimGrid_LIBRARY})
+   ```
+3. **Rebuild and run**:
+   ```bash
+   cd build && make my_platform_app
+   ./my_platform_app ../platforms/my_platform.xml
+   ```
+
+### Complete Example
+
+```bash
+# Generate a complete Edge-Fog-Cloud platform with direct Edge-Cloud links and template app
+./build/platform_generator hybrid-cluster 3 10 2 5 1 20 1 iot_platform.xml --generate-app
+
+# Output:
+#   - platforms/iot_platform.xml
+#   - tests/iot_platform_app.cpp
+```
+
 ## Examples
 
 The `tests/` directory contains complete example applications:

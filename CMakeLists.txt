@@ -117,6 +117,12 @@ add_executable(mqtt_edge_app
 )
 target_link_libraries(mqtt_edge_app enigma_platform enigma_mqtt ${SimGrid_LIBRARY})
 
+# Generated template apps: Uncomment and customize after running platform_generator --generate-app
+#add_executable(my_test_platform_app
+#    tests/my_test_platform_app.cpp
+#)
+#target_link_libraries(my_test_platform_app enigma_platform ${SimGrid_LIBRARY})
+
 # Example: generate all platforms
 #add_executable(generate_all_platforms
 #    examples/generate_all_platforms.cpp
