@@ -19,13 +19,13 @@ void printUsage(const char* progName) {
     std::cout << "    edge-cluster <num_clusters> <nodes_per_cluster>  - Edge clusters\n";
     std::cout << "    fog-cluster <num_clusters> <nodes_per_cluster>   - Fog clusters\n";
     std::cout << "    cloud-cluster <num_clusters> <nodes_per_cluster> - Cloud clusters\n";
-    std::cout << "    hybrid-cluster-flat <edge_clusters> <edge_nodes> <fog_clusters> <fog_nodes> <cloud_clusters> <cloud_nodes> [edge_cloud_direct] - Flat hybrid (optional direct Edge-Cloud)\n";
+    std::cout << "    hybrid-cluster <edge_clusters> <edge_nodes> <fog_clusters> <fog_nodes> <cloud_clusters> <cloud_nodes> [edge_cloud_direct] [output_file] - Flat hybrid (optional direct Edge-Cloud + optional output filename)\n";
     std::cout << "\nExamples:\n";
     std::cout << "  Simple:\n";
     std::cout << "    " << progName << " edge 10\n";
     std::cout << "\n  Clusters:\n";
     std::cout << "    " << progName << " edge-cluster 3 5       # 3 edge clusters with 5 devices each\n";
-    std::cout << "    " << progName << " hybrid-cluster-flat 2 10 2 5 1 20 1  # Flat hybrid with direct Edge-Cloud links\n";
+    std::cout << "    " << progName << " hybrid-cluster 2 10 2 5 1 20 1 custom_platform.xml  # Flat hybrid with direct Edge-Cloud links + custom file\n";
 }
 
 int main(int argc, char* argv[]) {
@@ -129,7 +129,7 @@ int main(int argc, char* argv[]) {
             PlatformGenerator gen;
             gen.generatePlatform("platforms/cloud_platform.xml", zone);
             
-        } else if (type == "hybrid-cluster-flat" && argc >= 8) {
+        } else if (type == "hybrid-cluster" && argc >= 8) {
             int edgeClusters = std::stoi(argv[2]);
             int edgeNodes = std::stoi(argv[3]);
             int fogClusters = std::stoi(argv[4]);
@@ -137,8 +137,23 @@ int main(int argc, char* argv[]) {
             int cloudClusters = std::stoi(argv[6]);
             int cloudNodes = std::stoi(argv[7]);
             bool directEdgeCloud = false;
-            if (argc >= 9) {
-                directEdgeCloud = (std::stoi(argv[8]) != 0);
+            std::string outputFile = "platforms/hybrid_platform.xml";
+            int optionalIndex = 8;
+            if (argc > optionalIndex) {
+                // Try parse edge_cloud_direct as integer; if not numeric treat as filename
+                char* endPtr = nullptr;
+                long val = strtol(argv[optionalIndex], &endPtr, 10);
+                if (endPtr != nullptr && *endPtr == '\0') {
+                    directEdgeCloud = (val != 0);
+                    optionalIndex++;
+                }
+            }
+            if (argc > optionalIndex) {
+                outputFile = argv[optionalIndex];
+                // if user did not include path, ensure it goes to platforms/ by default
+                if (outputFile.find('/') == std::string::npos) {
+                    outputFile = std::string("platforms/") + outputFile;
+                }
             }
             
             std::cout << "Generating flat hybrid platform with clusters:\n";
@@ -146,6 +161,7 @@ int main(int argc, char* argv[]) {
             std::cout << "  - Fog: " << fogClusters << " clusters × " << fogNodes << " nodes\n";
             std::cout << "  - Cloud: " << cloudClusters << " clusters × " << cloudNodes << " nodes\n";
             std::cout << "  - Direct Edge-Cloud links: " << (directEdgeCloud ? "ENABLED" : "DISABLED") << "\n";
+            std::cout << "  - Output file: " << outputFile << "\n";
             
             std::vector<ClusterConfig> edgeClustersVec, fogClustersVec, cloudClustersVec;
             
@@ -166,7 +182,7 @@ int main(int argc, char* argv[]) {
             
             auto zone = PlatformGenerator::createHybridWithClustersFlat(edgeClustersVec, fogClustersVec, cloudClustersVec, directEdgeCloud);
             PlatformGenerator gen;
-            gen.generatePlatform("platforms/hybrid_platform.xml", zone);
+            gen.generatePlatform(outputFile, zone);
             
         } else {
             std::cerr << "Error: Invalid arguments\n\n";

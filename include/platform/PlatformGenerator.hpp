@@ -77,9 +77,10 @@ struct ZoneConfig {
     bool auto_interconnect; // Automatically create routes between all elements
     bool use_native_clusters; // Use SimGrid native <cluster> tags instead of expanding to hosts
     bool allow_direct_edge_cloud; // Flat hybrid: allow direct Edge <-> Cloud connectivity (skip Fog)
+    bool force_flat_layout; // Treat as flat hybrid even if some tiers missing (avoid generic mesh links)
     
     ZoneConfig(const std::string& id_, const std::string& routing_ = "Full")
-        : id(id_), routing(routing_), auto_interconnect(true), use_native_clusters(true), allow_direct_edge_cloud(false) {}
+        : id(id_), routing(routing_), auto_interconnect(true), use_native_clusters(true), allow_direct_edge_cloud(false), force_flat_layout(false) {}
 };
 
 /**
@@ -98,7 +99,6 @@ public:
     static ZoneConfig createEdgeZone(const std::string& id, int numDevices);
     static ZoneConfig createFogZone(const std::string& id, int numNodes);
     static ZoneConfig createCloudZone(const std::string& id, int numServers);
-    // (Deprecated) Hierarchical hybrid removed – use flat variant instead.
     // Keeping signature for backward compatibility; returns flat hybrid layout.
     static ZoneConfig createHybridPlatform(int edgeDevices, int fogNodes, int cloudServers);
     

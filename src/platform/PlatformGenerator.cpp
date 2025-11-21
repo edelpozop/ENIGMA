@@ -71,7 +71,8 @@ void PlatformGenerator::writeZone(XMLWriter& writer, const ZoneConfig& zone, boo
             if (cluster.id.find("fog") != std::string::npos) hasFog = true;
             if (cluster.id.find("cloud") != std::string::npos) hasCloud = true;
         }
-        isFlatHybrid = (hasEdge && hasFog && hasCloud);
+        // Treat as flat if all tiers or forced
+        isFlatHybrid = zone.force_flat_layout || (hasEdge && hasFog && hasCloud);
     }
     
     if (!isFlatHybrid && zone.use_native_clusters && zone.auto_interconnect && zone.clusters.size() > 1) {
@@ -96,7 +97,7 @@ void PlatformGenerator::writeZone(XMLWriter& writer, const ZoneConfig& zone, boo
                 if (cluster.id.find("cloud") != std::string::npos) hasCloud = true;
             }
             
-            if (hasEdge && hasFog && hasCloud) {
+            if (zone.force_flat_layout || (hasEdge && hasFog && hasCloud)) {
                 // Flat hybrid: generate tiered inter-cluster routes
                 generateFlatHybridRoutes(writer, zone);
             } else {
@@ -336,21 +337,29 @@ ZoneConfig PlatformGenerator::createHybridWithClustersFlat(
     root.clusters.insert(root.clusters.end(), edgeClusters.begin(), edgeClusters.end());
     root.clusters.insert(root.clusters.end(), fogClusters.begin(), fogClusters.end());
     root.clusters.insert(root.clusters.end(), cloudClusters.begin(), cloudClusters.end());
+    // Force flat layout regardless of tier completeness (avoids duplicate auto links when some tiers missing)
+    root.force_flat_layout = true;
     
     // Create inter-cluster links
-    // Edge to Fog links
+    // Edge to Fog links (skip if no edges or no fogs)
     for (const auto& edge : edgeClusters) {
         for (const auto& fog : fogClusters) {
             std::string link_id = "link_" + edge.id + "_to_" + fog.id;
-            root.links.emplace_back(link_id, "500MBps", "10ms");
+            bool exists = false;
+            for (const auto& l : root.links) if (l.id == link_id) { exists = true; break; }
+            if (!exists)
+                root.links.emplace_back(link_id, "500MBps", "10ms");
         }
     }
     
-    // Fog to Cloud links
+    // Fog to Cloud links (skip if no fogs or no clouds)
     for (const auto& fog : fogClusters) {
         for (const auto& cloud : cloudClusters) {
             std::string link_id = "link_" + fog.id + "_to_" + cloud.id;
-            root.links.emplace_back(link_id, "5GBps", "50ms");
+            bool exists = false;
+            for (const auto& l : root.links) if (l.id == link_id) { exists = true; break; }
+            if (!exists)
+                root.links.emplace_back(link_id, "5GBps", "50ms");
         }
     }
     // Optional direct Edge <-> Cloud links (bypass fog)
@@ -359,8 +368,10 @@ ZoneConfig PlatformGenerator::createHybridWithClustersFlat(
         for (const auto& edge : edgeClusters) {
             for (const auto& cloud : cloudClusters) {
                 std::string link_id = "link_" + edge.id + "_to_" + cloud.id;
-                // Use intermediate bandwidth/latency values or reuse fog->cloud characteristics
-                root.links.emplace_back(link_id, "2GBps", "30ms");
+                bool exists = false;
+                for (const auto& l : root.links) if (l.id == link_id) { exists = true; break; }
+                if (!exists)
+                    root.links.emplace_back(link_id, "2GBps", "30ms");
             }
         }
     }
