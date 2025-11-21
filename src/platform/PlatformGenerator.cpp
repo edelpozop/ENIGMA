@@ -279,27 +279,20 @@ ZoneConfig PlatformGenerator::createCloudZone(const std::string& id, int numServ
     return zone;
 }
 
-ZoneConfig PlatformGenerator::createHybridPlatform(int edgeDevices, int fogNodes, 
-                                                     int cloudServers) {
-    ZoneConfig root("hybrid_platform", "Full");
-    
-    // Create Edge layer
-    auto edgeZone = createEdgeZone("edge_zone", edgeDevices);
-    root.subzones.push_back(edgeZone);
-    
-    // Create Fog layer
-    auto fogZone = createFogZone("fog_zone", fogNodes);
-    root.subzones.push_back(fogZone);
-    
-    // Create Cloud layer
-    auto cloudZone = createCloudZone("cloud_zone", cloudServers);
-    root.subzones.push_back(cloudZone);
-    
-    // Create inter-layer links
-    root.links.emplace_back("edge_to_fog", "500MBps", "10ms");
-    root.links.emplace_back("fog_to_cloud", "5GBps", "50ms");
-    
-    return root;
+ZoneConfig PlatformGenerator::createHybridPlatform(int edgeDevices, int fogNodes,
+                                                   int cloudServers) {
+    // Deprecated hierarchical hybrid replaced by flat hybrid layout
+    // Build clusters of size 1 (each device as a cluster) to preserve semantics
+    std::vector<ClusterConfig> edgeClusters;
+    for (int i = 0; i < edgeDevices; ++i)
+        edgeClusters.emplace_back("edge_cluster_" + std::to_string(i), 1, "1Gf", 1, "125MBps", "50us");
+    std::vector<ClusterConfig> fogClusters;
+    for (int i = 0; i < fogNodes; ++i)
+        fogClusters.emplace_back("fog_cluster_" + std::to_string(i), 1, "10Gf", 4, "1GBps", "10us");
+    std::vector<ClusterConfig> cloudClusters;
+    for (int i = 0; i < cloudServers; ++i)
+        cloudClusters.emplace_back("cloud_cluster_" + std::to_string(i), 1, "100Gf", 16, "10GBps", "1us");
+    return createHybridWithClustersFlat(edgeClusters, fogClusters, cloudClusters, false);
 }
 
 // Cluster-based configurations
@@ -327,43 +320,13 @@ ZoneConfig PlatformGenerator::createCloudWithClusters(const std::string& id,
     return zone;
 }
 
-ZoneConfig PlatformGenerator::createHybridWithClusters(
-    const std::vector<ClusterConfig>& edgeClusters,
-    const std::vector<ClusterConfig>& fogClusters,
-    const std::vector<ClusterConfig>& cloudClusters) {
-    
-    ZoneConfig root("hybrid_platform", "Full");
-    root.auto_interconnect = true;
-    
-    // Create Edge layer with clusters
-    if (!edgeClusters.empty()) {
-        auto edgeZone = createEdgeWithClusters("edge_zone", edgeClusters);
-        root.subzones.push_back(edgeZone);
-    }
-    
-    // Create Fog layer with clusters
-    if (!fogClusters.empty()) {
-        auto fogZone = createFogWithClusters("fog_zone", fogClusters);
-        root.subzones.push_back(fogZone);
-    }
-    
-    // Create Cloud layer with clusters
-    if (!cloudClusters.empty()) {
-        auto cloudZone = createCloudWithClusters("cloud_zone", cloudClusters);
-        root.subzones.push_back(cloudZone);
-    }
-    
-    // Create inter-layer links
-    root.links.emplace_back("edge_to_fog", "500MBps", "10ms");
-    root.links.emplace_back("fog_to_cloud", "5GBps", "50ms");
-    
-    return root;
-}
+// Removed hierarchical cluster hybrid – encourage flat layout.
 
 ZoneConfig PlatformGenerator::createHybridWithClustersFlat(
     const std::vector<ClusterConfig>& edgeClusters,
     const std::vector<ClusterConfig>& fogClusters,
-    const std::vector<ClusterConfig>& cloudClusters) {
+    const std::vector<ClusterConfig>& cloudClusters,
+    bool edgeCloudDirect) {
     
     // Flat hierarchy: all clusters directly under root zone
     ZoneConfig root("hybrid_platform", "Full");
@@ -388,6 +351,17 @@ ZoneConfig PlatformGenerator::createHybridWithClustersFlat(
         for (const auto& cloud : cloudClusters) {
             std::string link_id = "link_" + fog.id + "_to_" + cloud.id;
             root.links.emplace_back(link_id, "5GBps", "50ms");
+        }
+    }
+    // Optional direct Edge <-> Cloud links (bypass fog)
+    if (edgeCloudDirect) {
+        root.allow_direct_edge_cloud = true;
+        for (const auto& edge : edgeClusters) {
+            for (const auto& cloud : cloudClusters) {
+                std::string link_id = "link_" + edge.id + "_to_" + cloud.id;
+                // Use intermediate bandwidth/latency values or reuse fog->cloud characteristics
+                root.links.emplace_back(link_id, "2GBps", "30ms");
+            }
         }
     }
     
@@ -587,8 +561,24 @@ void PlatformGenerator::generateFlatHybridRoutes(XMLWriter& writer, const ZoneCo
         }
     }
     
-    // Note: We intentionally skip direct edge->cloud routes
-    // to force hierarchical communication through fog
+    // Direct Edge -> Cloud routes if enabled
+    if (zone.allow_direct_edge_cloud) {
+        for (const auto* edge : edge_clusters) {
+            for (const auto* cloud : cloud_clusters) {
+                std::string link_id = "link_" + edge->id + "_to_" + cloud->id;
+                std::map<std::string, std::string> zoneRoute_attrs;
+                zoneRoute_attrs["src"] = edge->id + "_zone";
+                zoneRoute_attrs["dst"] = cloud->id + "_zone";
+                zoneRoute_attrs["gw_src"] = edge->id + "_router";
+                zoneRoute_attrs["gw_dst"] = cloud->id + "_router";
+                writer.startElement("zoneRoute", zoneRoute_attrs);
+                std::map<std::string, std::string> link_ctn_attrs;
+                link_ctn_attrs["id"] = link_id;
+                writer.writeEmptyElement("link_ctn", link_ctn_attrs);
+                writer.endElement("zoneRoute");
+            }
+        }
+    }
 }
 
 } // namespace enigma

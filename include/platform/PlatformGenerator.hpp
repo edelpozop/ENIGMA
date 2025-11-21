@@ -76,9 +76,10 @@ struct ZoneConfig {
     std::vector<ZoneConfig> subzones;
     bool auto_interconnect; // Automatically create routes between all elements
     bool use_native_clusters; // Use SimGrid native <cluster> tags instead of expanding to hosts
+    bool allow_direct_edge_cloud; // Flat hybrid: allow direct Edge <-> Cloud connectivity (skip Fog)
     
     ZoneConfig(const std::string& id_, const std::string& routing_ = "Full")
-        : id(id_), routing(routing_), auto_interconnect(true), use_native_clusters(true) {}
+        : id(id_), routing(routing_), auto_interconnect(true), use_native_clusters(true), allow_direct_edge_cloud(false) {}
 };
 
 /**
@@ -97,6 +98,8 @@ public:
     static ZoneConfig createEdgeZone(const std::string& id, int numDevices);
     static ZoneConfig createFogZone(const std::string& id, int numNodes);
     static ZoneConfig createCloudZone(const std::string& id, int numServers);
+    // (Deprecated) Hierarchical hybrid removed – use flat variant instead.
+    // Keeping signature for backward compatibility; returns flat hybrid layout.
     static ZoneConfig createHybridPlatform(int edgeDevices, int fogNodes, int cloudServers);
     
     // Cluster-based configurations
@@ -108,16 +111,12 @@ public:
                                               const std::vector<ClusterConfig>& clusters);
     
     // Hybrid with clusters
-    static ZoneConfig createHybridWithClusters(
-        const std::vector<ClusterConfig>& edgeClusters,
-        const std::vector<ClusterConfig>& fogClusters,
-        const std::vector<ClusterConfig>& cloudClusters);
-    
-    // Hybrid with clusters (flat hierarchy - all clusters at same level)
+    // Flat hybrid (all clusters at same level) – optional direct Edge<->Cloud links.
     static ZoneConfig createHybridWithClustersFlat(
         const std::vector<ClusterConfig>& edgeClusters,
         const std::vector<ClusterConfig>& fogClusters,
-        const std::vector<ClusterConfig>& cloudClusters);
+        const std::vector<ClusterConfig>& cloudClusters,
+        bool edgeCloudDirect = false);
 
 protected:
     void writeZone(XMLWriter& writer, const ZoneConfig& zone, bool /* isRoot */);

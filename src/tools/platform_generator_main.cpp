@@ -14,22 +14,18 @@ void printUsage(const char* progName) {
     std::cout << "    edge <num_devices>            - Edge platform\n";
     std::cout << "    fog <num_nodes>               - Fog platform\n";
     std::cout << "    cloud <num_servers>           - Cloud platform\n";
-    std::cout << "    hybrid <edge> <fog> <cloud>   - Hybrid platform\n";
     std::cout << "    iot <sensors> <actuators>     - IoT platform\n";
     std::cout << "\n  Cluster-based (organized in clusters):\n";
     std::cout << "    edge-cluster <num_clusters> <nodes_per_cluster>  - Edge clusters\n";
     std::cout << "    fog-cluster <num_clusters> <nodes_per_cluster>   - Fog clusters\n";
     std::cout << "    cloud-cluster <num_clusters> <nodes_per_cluster> - Cloud clusters\n";
-    std::cout << "    hybrid-cluster <edge_clusters> <edge_nodes> <fog_clusters> <fog_nodes> <cloud_clusters> <cloud_nodes>\n";
-    std::cout << "    hybrid-cluster-flat <edge_clusters> <edge_nodes> <fog_clusters> <fog_nodes> <cloud_clusters> <cloud_nodes> - Flat hierarchy (recommended)\n";
+    std::cout << "    hybrid-cluster-flat <edge_clusters> <edge_nodes> <fog_clusters> <fog_nodes> <cloud_clusters> <cloud_nodes> [edge_cloud_direct] - Flat hybrid (optional direct Edge-Cloud)\n";
     std::cout << "\nExamples:\n";
     std::cout << "  Simple:\n";
     std::cout << "    " << progName << " edge 10\n";
-    std::cout << "    " << progName << " hybrid 10 5 3\n";
     std::cout << "\n  Clusters:\n";
     std::cout << "    " << progName << " edge-cluster 3 5       # 3 edge clusters with 5 devices each\n";
-    std::cout << "    " << progName << " hybrid-cluster 2 10 2 5 1 20  # Complex hybrid (3-level hierarchy)\n";
-    std::cout << "    " << progName << " hybrid-cluster-flat 2 10 2 5 1 20  # Flat hybrid (recommended)\n";
+    std::cout << "    " << progName << " hybrid-cluster-flat 2 10 2 5 1 20 1  # Flat hybrid with direct Edge-Cloud links\n";
 }
 
 int main(int argc, char* argv[]) {
@@ -66,23 +62,9 @@ int main(int argc, char* argv[]) {
             PlatformGenerator gen;
             gen.generatePlatform("platforms/cloud_platform.xml", zone);
             
-        } else if (type == "hybrid" && argc >= 5) {
-            int edge = std::stoi(argv[2]);
-            int fog = std::stoi(argv[3]);
-            int cloud = std::stoi(argv[4]);
-            
-            std::cout << "Generating hybrid platform:\n";
-            std::cout << "  - Edge: " << edge << " devices\n";
-            std::cout << "  - Fog: " << fog << " nodes\n";
-            std::cout << "  - Cloud: " << cloud << " servers\n";
-            
-            PlatformBuilder builder;
-            builder.createEdgeFogCloud("hybrid_platform")
-                   .addEdgeLayer(edge, "1Gf", "125MBps")
-                   .addFogLayer(fog, "10Gf", "1GBps")
-                   .addCloudLayer(cloud, "100Gf", "10GBps")
-                   .build();
-                   
+        } else if (type == "hybrid") {
+            std::cerr << "The 'hybrid' hierarchical mode is deprecated. Use 'hybrid-cluster-flat'.\n";
+            return 1;
         } else if (type == "iot" && argc >= 4) {
             int sensors = std::stoi(argv[2]);
             int actuators = std::stoi(argv[3]);
@@ -147,21 +129,23 @@ int main(int argc, char* argv[]) {
             PlatformGenerator gen;
             gen.generatePlatform("platforms/cloud_platform.xml", zone);
             
-        } else if ((type == "hybrid-cluster" || type == "hybrid-cluster-flat") && argc >= 8) {
+        } else if (type == "hybrid-cluster-flat" && argc >= 8) {
             int edgeClusters = std::stoi(argv[2]);
             int edgeNodes = std::stoi(argv[3]);
             int fogClusters = std::stoi(argv[4]);
             int fogNodes = std::stoi(argv[5]);
             int cloudClusters = std::stoi(argv[6]);
             int cloudNodes = std::stoi(argv[7]);
+            bool directEdgeCloud = false;
+            if (argc >= 9) {
+                directEdgeCloud = (std::stoi(argv[8]) != 0);
+            }
             
-            bool useFlat = (type == "hybrid-cluster-flat");
-            
-            std::cout << "Generating hybrid platform with clusters (" 
-                      << (useFlat ? "flat hierarchy" : "3-level hierarchy") << "):\n";
+            std::cout << "Generating flat hybrid platform with clusters:\n";
             std::cout << "  - Edge: " << edgeClusters << " clusters × " << edgeNodes << " nodes\n";
             std::cout << "  - Fog: " << fogClusters << " clusters × " << fogNodes << " nodes\n";
             std::cout << "  - Cloud: " << cloudClusters << " clusters × " << cloudNodes << " nodes\n";
+            std::cout << "  - Direct Edge-Cloud links: " << (directEdgeCloud ? "ENABLED" : "DISABLED") << "\n";
             
             std::vector<ClusterConfig> edgeClustersVec, fogClustersVec, cloudClustersVec;
             
@@ -180,9 +164,7 @@ int main(int argc, char* argv[]) {
                                              cloudNodes, "100Gf", 16, "10GBps", "1us");
             }
             
-            auto zone = useFlat 
-                ? PlatformGenerator::createHybridWithClustersFlat(edgeClustersVec, fogClustersVec, cloudClustersVec)
-                : PlatformGenerator::createHybridWithClusters(edgeClustersVec, fogClustersVec, cloudClustersVec);
+            auto zone = PlatformGenerator::createHybridWithClustersFlat(edgeClustersVec, fogClustersVec, cloudClustersVec, directEdgeCloud);
             PlatformGenerator gen;
             gen.generatePlatform("platforms/hybrid_platform.xml", zone);
             
