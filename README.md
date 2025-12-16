@@ -280,6 +280,7 @@ ENIGMA/
 
 ### 2023
 
+<details>
 <summary>:newspaper: A scalable simulator for cloud, fog and edge computing platforms with mobility support.</summary>
  
   * Authors: Elías Del-Pozo-Puñal, Félix García-Carballeira, Diego Camarmas-Alonso
@@ -296,9 +297,6 @@ year = {2023},
 issn = {0167-739X},
 doi = {https://doi.org/10.1016/j.future.2023.02.010},
 url = {https://www.sciencedirect.com/science/article/pii/S0167739X23000511},
-author = {Elías Del-Pozo-Puñal and Félix García-Carballeira and Diego Camarmas-Alonso},
-keywords = {Internet of things, Simulation, Fog and cloud computing, Mobility, Scalability},
-abstract = {In recent years, the devices that make up the Internet of Things (IoT) paradigm have been increasing in number and complexity as different layers of network computing, such as Cloud, Edge and Fog Computing, have emerged. Thanks to these latest paradigms and their different types of communications, it has been possible to reduce and distribute the computational load on the network. However, to build these infrastructures and reduce the cost, it is necessary to use a simulation platform to model these environments and analyze their behavior (power consumption, CPU usage, bandwidth, etc.) beforehand. An essential aspect of simulators is scalability, the ability to add new components and simulate large infrastructures without compromising the performance of the simulator. Many existing simulators, as will be discussed in this article, cannot scale adequately as new elements are added to the system. Furthermore, in these environments, it is useful to simulate mobile devices and to know the location of these devices for the development and analysis of new algorithms. To solve these problems, this article presents and describes the ENIGMA simulator. ENIGMA is a scalable simulator of Edge, Fog and Cloud computing infrastructures, which allows to efficiently simulate a large number of devices and elements and to analyze different characteristics (CPU usage, power consumption, network bandwidth, application execution time, etc.). Its objective is to analyze new infrastructures and algorithms. ENIGMA also includes support for including mobile devices and an API to integrate their visualization in graphical maps. The article presents an evaluation to compare the scalability of ENIGMA with other state-of-the-art simulators and different use cases that illustrate its operation.}
 }
   ```
 </details>
