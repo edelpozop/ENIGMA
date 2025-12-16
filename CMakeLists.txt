@@ -13,7 +13,7 @@ set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3")
 
 # Find SimGrid
 # First try with find_package
-find_package(SimGrid 4.0 QUIET)
+find_package(SimGrid 4.1 QUIET)
 
 # If not found, try manual paths
 if(NOT SimGrid_FOUND)
@@ -116,6 +116,25 @@ add_executable(mqtt_edge_app
     tests/mqtt_edge_app.cpp
 )
 target_link_libraries(mqtt_edge_app enigma_platform enigma_mqtt ${SimGrid_LIBRARY})
+
+# Ping-pong latency measurement app
+add_executable(pingpong_fit_to_g5k_app
+    tests/pingpong_fit_to_g5k_app.cpp
+)
+target_link_libraries(pingpong_fit_to_g5k_app enigma_platform ${SimGrid_LIBRARY})
+
+
+# Distributed block write app for Grid'5000
+add_executable(fit_to_g5k_app
+    tests/fit_to_g5k_app.cpp
+)
+target_link_libraries(fit_to_g5k_app enigma_platform ${SimGrid_LIBRARY})
+
+# Distributed block write app for Grid'5000
+add_executable(fit_to_g5k_app_v6
+    tests/fit_to_g5k_app_v6.cpp
+)
+target_link_libraries(fit_to_g5k_app_v6 enigma_platform ${SimGrid_LIBRARY})
 
 # Generated template apps: Uncomment and customize after running platform_generator --generate-app
 #add_executable(my_test_platform_app

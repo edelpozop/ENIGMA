@@ -193,10 +193,10 @@ int main(int argc, char* argv[]) {
     start_broker(hosts[0], "mqtt_broker");
     
     // Create IoT Sensors (publishers)
-    hosts[1]->add_actor("sensor", IoTSensor("sensors/temp", 5));
+    simgrid::s4u::Actor::create("sensor", hosts[1], IoTSensor("sensors/temp", 5));
     
     // Create Edge Gateway (subscriber)
-    hosts[2]->add_actor("gateway", EdgeGateway("sensors/temp"));
+    simgrid::s4u::Actor::create("gateway", hosts[2], EdgeGateway("sensors/temp"));
     
     e.run();
     return 0;

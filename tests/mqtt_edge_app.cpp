@@ -256,16 +256,16 @@ int main(int argc, char* argv[]) {
     
     // Start Edge Gateways (subscribe to "sensors/temperature", publish to "edge/filtered")
     for (auto* host : gateways) {
-        host->add_actor("edge_gateway", 
-                       EdgeGateway("sensors/temperature", "edge/filtered", 
-                                 sensors.size() * 5, has_fog));  // forward_to_fog = has_fog
+        host->add_actor("edge_gateway",
+                        EdgeGateway("sensors/temperature", "edge/filtered",
+                                    sensors.size() * 5, has_fog));  // forward_to_fog = has_fog
     }
     
     // Start Fog Aggregators (subscribe to "edge/filtered") - only if fog nodes exist
     if (has_fog) {
         for (auto* host : fog_nodes) {
             host->add_actor("fog_aggregator",
-                           FogAggregator("edge/filtered", gateways.size() * sensors.size() * 5, 15.0));
+                            FogAggregator("edge/filtered", gateways.size() * sensors.size() * 5, 15.0));
         }
         XBT_INFO("MQTT Pipeline: Sensors -> Gateways -> Fog");
     } else {
