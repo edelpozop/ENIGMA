@@ -9,6 +9,12 @@ A C++ project that enables creation of XML platforms for Edge, Fog, and Cloud in
 - SimGrid 4.1 or higher
 - Compatible compiler (GCC 7+, Clang 5+, MSVC 2017+)
 
+**Python (optional – for Python simulations and mobility visualization):**
+
+- Python 3.8+
+- SimGrid Python bindings (`libsimgrid-dev` includes them)
+- `folium` (`pip install folium`) – for interactive map visualization
+
 ## SimGrid Installation
 
 ### Ubuntu/Debian
@@ -51,12 +57,20 @@ ENIGMA/
 │   │   └── mqtt/           # MQTT implementation (Broker, Publisher, Subscriber)
 │   ├── tools/              # Command-line tools (platform_generator)
 │   └── utils/              # Utility implementations (XMLWriter)
+├── include/mobility/        # Mobility module headers (C++)
+├── src/mobility/            # Mobility module sources (C++)
+├── src/python/              # Python API
+│   ├── enigma/mobility/    # Python mobility package
+│   ├── tests/              # Python test apps
+│   └── tools/              # Post-sim viewer (mobility_viewer.py)
+├── platforms/coords/        # GPS trace CSV files (one per device)
 ├── tests/                   # Test/Example applications
 │   ├── edge_computing.cpp  # Basic edge computing
 │   ├── fog_analytics.cpp   # Fog analytics
 │   ├── hybrid_cloud.cpp    # Multi-tier hybrid
 │   ├── data_offloading.cpp # Smart offloading decisions
 │   ├── mqtt_edge_app.cpp   # MQTT pub/sub example
+│   └── mobility_test.cpp   # Mobility module demo
 ├── build/                   # Build artifacts (generated)
 ├── CMakeLists.txt           # CMake configuration
 ├── build.sh                 # Build script
@@ -115,6 +129,221 @@ void gateway_actor() {
     sub.subscribe("sensors/temp");
     auto msg = sub.receive();
 }
+```
+
+### 4. Use Mobility (Optional)
+
+The mobility module attaches real GPS traces to simulated devices and records their positions during the simulation.  After the simulation it exports the data and generates an **interactive map** (OpenStreetMap) where you can drag a time slider to see each device's position and all its recorded stats at every timestamp.
+
+> 📖 **Full documentation:**
+> - [C++ Mobility Module](include/mobility/README.md) — `MobilityPosition`, `MobilityTrace`, `MobilityManager`, build instructions, CLI demo
+> - [Python Mobility Module](src/python/enigma/mobility/README.md) — `MobilityManager`, `MobilityRecorder`, `MobilityVisualizer`, standalone viewer, online/offline maps
+
+#### GPS trace format
+
+Create one CSV file per device inside a directory (e.g. `platforms/coords/`).  Only `timestamp`, `latitude` and `longitude` are mandatory.  All other columns (whatever names and however many) are automatically loaded, interpolated, and shown in map popups.
+
+```
+platforms/coords/
+├── edge_cluster_0_node_0.csv
+├── edge_cluster_0_node_1.csv
+└── ...
+```
+
+```csv
+timestamp,latitude,longitude,altitude,speed,heading,accuracy
+0,48.8572,2.3540,34.6,5.0,90.0,7.5
+1,48.8572,2.3541,34.8,5.0,92.1,7.3
+...
+```
+
+The filename stem must match the SimGrid host name exactly.
+
+#### Declare the coords directory in the XML platform
+
+Add a `mobility_dir` property to any zone in your platform XML:
+
+```xml
+<zone id="my_platform" routing="Full">
+  <prop id="mobility_dir" value="platforms/coords/"/>
+  <!-- ... rest of platform ... -->
+</zone>
+```
+
+#### C++ usage
+
+```cpp
+#include "mobility/MobilityManager.hpp"
+using namespace enigma::mobility;
+
+int main(int argc, char* argv[]) {
+    simgrid::s4u::Engine e(&argc, argv);
+    e.load_platform(argv[1]);
+
+    // Auto-detects mobility_dir from XML or pass it explicitly:
+    MobilityManager mob(e);                        // reads XML property
+    // MobilityManager mob(e, "platforms/coords/"); // explicit path
+
+    // Start a periodic actor that records all device positions every 0.5 s
+    mob.start_periodic_actor(e, 0.5);
+
+    // Inside any actor: query interpolated position at current time
+    auto pos = mob.position_at("edge_cluster_0_node_1",
+                               simgrid::s4u::Engine::get_clock());
+    if (pos) {
+        double spd = pos->extra.count("speed") ? pos->extra.at("speed") : 0.0;
+        XBT_INFO("lat=%.6f lon=%.6f  speed=%.1f m/s",
+                 pos->latitude, pos->longitude, spd);
+    }
+
+    e.run();
+
+    // Export results
+    mob.export_json("snapshots.json");
+    mob.export_csv("snapshots.csv");
+    mob.export_traces_json("raw_traces.json");
+    return 0;
+}
+```
+
+Build with the `enigma_mobility` library:
+
+```cmake
+add_executable(my_app tests/my_app.cpp)
+target_link_libraries(my_app enigma_mobility enigma_platform ${SimGrid_LIBRARY})
+```
+
+#### Python usage
+
+```python
+import sys
+import simgrid
+from enigma.mobility import MobilityManager, MobilityVisualizer
+
+sys.path.insert(0, "src/python")
+
+def my_actor(mob: MobilityManager, host_name: str):
+    for _ in range(10):
+        t   = simgrid.Engine.clock
+        pos = mob.record(host_name, t)       # record + return position
+        if pos:
+            spd = pos.extra.get("speed", 0.0)
+            simgrid.this_actor.info(f"lat={pos.latitude:.6f}  spd={spd:.1f} m/s")
+        simgrid.this_actor.sleep_for(1.0)
+
+def main():
+    e = simgrid.Engine(sys.argv)
+    e.load_platform(sys.argv[1])
+
+    mob = MobilityManager(e, coords_dir="platforms/coords/")
+    mob.start_periodic_actor(e, interval_s=0.5)
+
+    for host in e.all_hosts:
+        host.add_actor("worker", lambda h=host.name: my_actor(mob, h))
+
+    e.run()
+
+    # Exports
+    mob.recorder.export_csv("snapshots.csv")
+    mob.recorder.export_json("snapshots.json")
+    mob.recorder.export_geojson("trajectories.geojson")
+    mob.recorder.print_stats()
+
+    # Interactive map (requires folium: pip install folium)
+    MobilityVisualizer.save_interactive_map(mob.recorder, "mobility_map.html")
+
+main()
+```
+
+#### Interactive map visualization
+
+After the simulation, open the generated `mobility_map.html` in any browser:
+
+- **Trajectory lines** for every device on OpenStreetMap
+- **Time slider** – drag or press Play to animate device positions frame by frame; the slider step matches the recording interval automatically
+- **Click any dot** to see a popup with all recorded stats for that device at that timestamp (whatever columns your CSV contained)
+- **Layer toggle** and device colour legend
+
+##### Online mode (default)
+
+The HTML references CDN URLs for Leaflet, jQuery, etc.  Browsers block these
+when opening a `file://` URL (CORS restriction), so you need a local HTTP server:
+
+```bash
+# Start a local server in the output directory
+cd /tmp/coords2_out
+python3 -m http.server 8765
+
+# Open in browser
+xdg-open http://localhost:8765/trajectory_map.html
+
+# Stop the server when done
+kill $(lsof -ti:8765)
+# or
+pkill -f "http.server 8765"
+```
+
+##### Offline mode (`--offline`)
+
+Downloads and embeds all JS/CSS inline so the HTML opens directly as `file://`
+without a local server.  The file will be ~6.5 MB.  Map tiles
+(OpenStreetMap background) are still fetched live, so an internet connection is
+needed to see the map background.
+
+
+```bash
+# Python simulation test
+python3 src/python/tests/mobility_test.py platform.xml --offline
+
+# Standalone viewer
+python3 src/python/tools/mobility_viewer.py snapshots.json --offline
+
+# Then open directly (no server needed)
+xdg-open trajectory_map.html
+```
+
+| Mode | HTML opens as `file://` | Needs internet to view | File size |
+|------|:---:|:---:|:---:|
+| `--online` (default) | ❌ requires HTTP server | ✅ CDN + tiles | ~1.5 MB |
+| `--offline` | ✅ directly | ✅ tiles only | ~6.5 MB |
+
+You can also generate the map from any previously saved snapshot file:
+
+```bash
+# From a JSON or CSV snapshot file
+python3 src/python/tools/mobility_viewer.py snapshots.json
+python3 src/python/tools/mobility_viewer.py snapshots.json --save my_map.html --offline
+
+# Print trajectory statistics without opening a map
+python3 src/python/tools/mobility_viewer.py snapshots.csv --stats-only
+
+# Filter specific devices
+python3 src/python/tools/mobility_viewer.py snapshots.json \
+    --devices edge_cluster_0_node_1 edge_cluster_1_node_2
+
+# C++ output can also be visualized directly
+python3 src/python/tools/mobility_viewer.py /tmp/cpp_mob_out_snapshots.json
+```
+
+#### Live map during simulation
+
+Instantiate `MobilityVisualizer` before the simulation and pass it to `MobilityManager`.  A background thread rebuilds the map every few seconds; any browser tab with the file open will auto-refresh.
+
+```python
+viz = MobilityVisualizer(
+    title="My Sim – Live",
+    live_path="/tmp/mobility_live.html",
+    update_interval_s=5.0,
+    auto_open=True,              # opens browser automatically
+)
+viz.start()
+
+mob = MobilityManager(e, coords_dir="platforms/coords/", visualizer=viz)
+mob.start_periodic_actor(e, 0.5)
+e.run()
+
+viz.stop()
+viz.replay_from_recorder(mob.recorder, save_path="final_map.html")
 ```
 
 ## Platform Generator Tool
@@ -216,6 +445,9 @@ The `tests/` directory contains complete example applications:
 - **hybrid_cloud**: Hybrid Edge-Fog-Cloud architecture
 - **data_offloading**: Smart offloading with request/response cycle
 - **mqtt_edge_app**: MQTT publish/subscribe pattern for IoT/Edge
+- **mobility_test**: Mobility module demo – loads GPS traces, records snapshots, exports JSON/CSV and interactive map
+
+Python equivalents live in `src/python/tests/`.
 
 ## 📁 Detailed Project Structure
 
@@ -234,6 +466,10 @@ ENIGMA/
 │   │       ├── MQTTBroker.hpp     # Broker component
 │   │       ├── MQTTPublisher.hpp  # Publisher client
 │   │       └── MQTTSubscriber.hpp # Subscriber client
+│   ├── mobility/           # Mobility module (C++)
+│   │   ├── MobilityPosition.hpp  # Position snapshot (timestamp+lat+lon+extra)
+│   │   ├── MobilityTrace.hpp     # CSV loader + linear interpolation
+│   │   └── MobilityManager.hpp   # Manager: load traces, record, export
 │   └── utils/              # Utilities
 │       └── XMLWriter.hpp
 │
@@ -249,19 +485,36 @@ ENIGMA/
 │   │       ├── MQTTBroker.cpp
 │   │       ├── MQTTPublisher.cpp
 │   │       └── MQTTSubscriber.cpp
+│   ├── mobility/           # Mobility module (C++)
+│   │   ├── MobilityTrace.cpp
+│   │   └── MobilityManager.cpp
 │   ├── tools/              # CLI tools
 │   │   └── platform_generator_main.cpp
-│   └── utils/              # Utility implementations
-│       └── XMLWriter.cpp
+│   ├── utils/              # Utility implementations
+│   │   └── XMLWriter.cpp
+│   └── python/             # Python API
+│       ├── enigma/
+│       │   └── mobility/   # Python mobility package
+│       │       ├── __init__.py
+│       │       ├── mobility_trace.py      # CSV loader + interpolation
+│       │       ├── mobility_manager.py    # SimGrid integration
+│       │       ├── mobility_recorder.py   # Snapshot collection + export
+│       │       └── mobility_visualizer.py # Folium interactive map
+│       ├── tests/
+│       │   └── mobility_test.py           # Python simulation demo
+│       └── tools/
+│           └── mobility_viewer.py         # Standalone post-sim viewer
 │
-├── tests/                   # Test applications (5 apps)
+├── tests/                   # Test applications (C++)
 │   ├── edge_computing.cpp  # Edge-only processing
 │   ├── fog_analytics.cpp   # Fog layer analytics
 │   ├── hybrid_cloud.cpp    # Multi-tier application
 │   ├── data_offloading.cpp # Smart offloading with responses
 │   ├── mqtt_edge_app.cpp   # MQTT pub/sub IoT example
+│   └── mobility_test.cpp   # Mobility module demo
 │
-├── platforms/               # Generated XML platforms
+├── platforms/               # XML platforms
+│   └── coords/             # GPS trace CSV files (one per device)
 ├── deployments/             # Deployment configurations
 ├── build/                   # Build output directory
 │
