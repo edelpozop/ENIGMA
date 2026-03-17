@@ -33,6 +33,7 @@ _ROOT = os.path.join(_HERE, "..")
 if _ROOT not in sys.path:
     sys.path.insert(0, _ROOT)
 
+import signal
 import simgrid
 
 from enigma.mobility import (
@@ -104,19 +105,19 @@ def main() -> None:
     if len(sys.argv) < 2:
         print(f"Usage: {sys.argv[0]} <platform.xml> [--coords-dir <dir>] "
               "[--output <prefix>] [--interval <s>] [--no-live] "
-              "[--no-replay] [--fps <n>] [--save-replay]", file=sys.stderr)
+              "[--no-replay] [--fps <n>] [--save-replay] [--online|--offline]", file=sys.stderr)
         sys.exit(1)
 
-    platform_xml = sys.argv[1]
-    coords_dir   = None
+    platform_xml  = sys.argv[1]
+    coords_dir    = None
     # Default output next to this script, not the working directory
-    output_dir   = os.path.join(os.path.dirname(os.path.abspath(__file__)), "mobility_output")
-    interval_s   = 0.5
-    live_viz     = True
-    fps          = 15.0
-    save_replay  = False
-    show_replay  = True
-    offline_mode = False
+    output_dir    = os.path.join(os.path.dirname(os.path.abspath(__file__)), "mobility_output")
+    interval_s    = 0.5
+    live_viz      = True
+    fps           = 15.0
+    save_replay   = False
+    show_replay   = True
+    offline_mode  = False
 
     i = 2
     while i < len(sys.argv):
@@ -161,7 +162,7 @@ def main() -> None:
             live_path=os.path.join(output_dir, "mobility_live.html"),
         )
         viz.start()
-        simgrid.this_actor.info("Live visualization window opened")
+        simgrid.this_actor.info("Live visualization window opened (Playwright)")
 
     # ---- mobility manager ------------------------------------------------- #
     mob = MobilityManager(e, coords_dir=coords_dir, visualizer=viz,
@@ -177,7 +178,8 @@ def main() -> None:
         if mob.has_trace(host.name):
             simgrid.Actor.create(
                 "mobile_actor", host,
-                MobileActor(host.name, mob, interval_s=1.5, iterations=8),
+                MobileActor(host.name, mob, interval_s=1.5,
+                            iterations=mob.get_trace(host.name).size),
             )
             deployed += 1
             simgrid.this_actor.info(f"Deployed mobile actor on '{host.name}'")
@@ -189,7 +191,20 @@ def main() -> None:
         )
 
     # ---- run simulation --------------------------------------------------- #
-    e.run()
+    try:
+        e.run()
+    except KeyboardInterrupt:
+        print("\n[mobility_test] Simulation interrupted (Ctrl+C).")
+        if viz:
+            viz._running = False
+
+    # SimGrid installs a persistent C-level SIGINT handler that stays active
+    # even after e.run() returns.  If SIGINT arrives later (e.g. during the
+    # input() prompt) SimGrid's handler fires and tries to decref Python objects
+    # without the GIL → pybind11 SIGABRT (exit 134).
+    # Restore Python's default SIGINT handler so Ctrl+C raises KeyboardInterrupt
+    # normally from this point on.
+    signal.signal(signal.SIGINT, signal.default_int_handler)
 
     simgrid.this_actor.info(
         f"=== Simulation completed – t={simgrid.Engine.clock:.3f} s ==="
@@ -230,20 +245,15 @@ def main() -> None:
     simgrid.this_actor.info(f"  {map_path}")
 
     # ---- interactive replay ----------------------------------------------- #
-    if show_replay:
-        if viz is None:
-            viz = MobilityVisualizer(title="ENIGMA – Device Mobility",
-                                     live_path=os.path.join(output_dir, "mobility_live.html"),
-                                     offline=offline_mode)
-        # Always save replay into output_dir (--save-replay controls whether the
-        # file is kept; here we always write it so the path stays out of /tmp)
-        replay_save = os.path.join(output_dir, "replay.html")
-        simgrid.this_actor.info("Opening interactive replay in browser…")
-        viz.replay_from_recorder(
-            mob.recorder, save_path=replay_save, open_browser=True, offline=offline_mode
-        )
+    if show_replay and viz is not None:
+        simgrid.this_actor.info("Loading final map into Playwright browser…")
+        viz.show_final(map_path)
+        # Blocks until the user closes the browser window (or Ctrl+C).
+        viz.wait_for_close()
     else:
-        simgrid.this_actor.info("Replay skipped (--no-replay)")
+        if viz is not None:
+            viz.close_browser()
+        simgrid.this_actor.info(f"Map saved → open manually: {map_path}")
 
 
 if __name__ == "__main__":

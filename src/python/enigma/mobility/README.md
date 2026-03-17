@@ -214,7 +214,7 @@ rec.export_geojson("out.geojson")
 ```python
 from enigma.mobility import MobilityVisualizer
 
-# Online (default) — needs python3 -m http.server 8765 to open as file://
+# Online (default) — opens via Playwright as file:// directly (no HTTP server needed)
 MobilityVisualizer.save_interactive_map(recorder, "map.html")
 
 # Offline — embeds all JS/CSS, opens as file:// directly (~6.5 MB)
@@ -231,23 +231,24 @@ MobilityVisualizer.save_interactive_map(
 
 #### Live (during simulation)
 
+A Playwright/Chromium window opens automatically and refreshes while the simulation runs.  When the simulation ends the final map is navigated to inside the same window; calling `wait_for_close()` blocks the process until the user closes the browser.
+
 ```python
 viz = MobilityVisualizer(
-    title      = "My Sim – Live",
-    live_path  = "/tmp/out/mobility_live.html",  # where the live HTML is written
-    update_interval_s = 3.0,                     # rebuilt every 3 real seconds
-    auto_open  = True,                           # open browser automatically
-    offline    = False,                          # online mode for live
+    title             = "My Sim – Live",
+    live_path         = "/tmp/out/mobility_live.html",  # where the live HTML is written
+    update_interval_s = 3.0,                            # rebuilt every 3 real seconds
+    offline           = False,                          # use True to embed CDN inline
 )
-viz.start()
+viz.start()   # opens Playwright/Chromium automatically
 
 mob = MobilityManager(engine, coords_dir="platforms/coords/", visualizer=viz)
 mob.start_periodic_actor(engine, interval_s=0.5)
 engine.run()
 
-viz.stop()
-# Save a final full-resolution replay map
-viz.replay_from_recorder(mob.recorder, save_path="/tmp/out/replay.html", offline=True)
+viz.stop()                                            # keeps browser open after sim
+viz.show_final("/tmp/out/replay.html")                # navigate to final full map
+viz.wait_for_close()                                  # exits when user closes browser
 ```
 
 ---
@@ -272,13 +273,14 @@ python3 src/python/tools/mobility_viewer.py snapshots.json \
     --devices edge_0 edge_1 --offline
 ```
 
-### Online mode — HTTP server
+### Online vs offline mode
 
-```bash
-cd /output/dir && python3 -m http.server 8765
-xdg-open http://localhost:8765/map.html
-kill $(lsof -ti:8765)          # stop when done
-```
+Because the visualizer always uses Playwright/Chromium, both modes open as `file://` directly — no HTTP server is needed.
+
+| Mode | CDN resources | Internet needed to view | HTML size |
+|------|:---:|:---:|:---:|
+| `--online` (default) | fetched at view time | ✅ CDN + map tiles | ~1.5 MB |
+| `--offline` | embedded inline | map tiles only | ~6.5 MB |
 
 ---
 
@@ -288,5 +290,5 @@ kill $(lsof -ti:8765)          # stop when done
 - **Time slider** — play/pause animation; step matches recording interval
 - **Click any dot** — popup with all recorded stats for that snapshot
 - **Layer toggle** and device colour legend
-- Online: ~1.5 MB, requires HTTP server or CDN access
-- Offline (`--offline`): ~6.5 MB, opens as `file://` directly
+- Online: ~1.5 MB, CDN resources loaded at view time
+- Offline (`--offline`): ~6.5 MB, fully self-contained `file://`

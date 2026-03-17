@@ -118,10 +118,10 @@ The JSON and CSV files produced by the C++ binary can be fed directly to the
 Python viewer (no re-simulation needed):
 
 ```bash
-# Online mode (needs http.server)
+# Online mode (Playwright opens as file:// directly — no HTTP server needed)
 python3 src/python/tools/mobility_viewer.py snapshots.json
 
-# Offline mode (self-contained file://)
+# Offline mode (CDN embedded inline, ~6.5 MB)
 python3 src/python/tools/mobility_viewer.py snapshots.json --offline --save map.html
 ```
 

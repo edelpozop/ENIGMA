@@ -42,6 +42,7 @@ Usage
 from __future__ import annotations
 
 import os
+import queue
 import subprocess
 import sys
 import threading
@@ -462,8 +463,6 @@ class MobilityVisualizer:
         Path where the live HTML file is written.
     update_interval_s : float
         How often (real-time seconds) the live HTML is regenerated.
-    auto_open : bool
-        If True (default), ``start()`` opens the file in the default browser.
     push_rate_limit : float
         Minimum real-time seconds between two ``push()`` calls per device
         that actually enqueue an update (throttle for busy actors).
@@ -474,20 +473,22 @@ class MobilityVisualizer:
         title: str = "ENIGMA Mobility – Live",
         live_path: str = "/tmp/enigma_mobility_live.html",
         update_interval_s: float = 3.0,
-        auto_open: bool = True,
         push_rate_limit: float = 0.2,
         offline: bool = False,
     ) -> None:
         self.title              = title
         self._live_path         = os.path.abspath(live_path)
         self._update_interval   = update_interval_s
-        self._auto_open         = auto_open
         self._push_rate_limit   = push_rate_limit
         self._offline           = offline
 
         self._lock              = threading.Lock()
         self._buffer: Dict[str, List[MobilityPosition]] = {}
         self._last_push: Dict[str, float] = {}
+        # Queue used to send commands to the Playwright thread:
+        #   str  → navigate to that URL
+        #   None → close browser
+        self._playwright_queue: queue.Queue = queue.Queue()
 
         self._running           = False
         self._thread: Optional[threading.Thread] = None
@@ -497,13 +498,14 @@ class MobilityVisualizer:
     # ------------------------------------------------------------------ #
 
     def start(self) -> None:
-        """Start the background refresh thread and (optionally) open browser."""
+        """Start the background Playwright browser and refresh thread."""
         self._running = True
         self._write_placeholder()
-        self._thread = threading.Thread(target=self._refresh_loop, daemon=True)
+        self._thread = threading.Thread(
+            target=self._refresh_loop,
+            daemon=False,
+        )
         self._thread.start()
-        if self._auto_open:
-            _open_browser(f"file://{self._live_path}")
         print(f"[MobilityVisualizer] Live map: file://{self._live_path}")
 
     def push(self, device: str, pos: MobilityPosition) -> None:
@@ -519,11 +521,37 @@ class MobilityVisualizer:
             self._buffer.setdefault(device, []).append(pos)
 
     def stop(self) -> None:
-        """Stop the background thread and write a final map."""
+        """Stop the refresh loop.  The Playwright browser stays open."""
         self._running = False
+        # The thread writes the final map and reloads the browser internally;
+        # don't join here so the browser remains visible.
+
+    def show_final(self, path: str) -> None:
+        """Navigate the live Playwright browser tab to a finished HTML map."""
+        self._playwright_queue.put(f"file://{os.path.abspath(path)}")
+
+    def close_browser(self) -> None:
+        """
+        Close the Playwright browser window.
+        Call this explicitly when the application is about to exit.
+        """
+        self._playwright_queue.put(None)
         if self._thread is not None:
-            self._thread.join(timeout=self._update_interval + 2)
-        self._write_live_map()
+            self._thread.join(timeout=10)
+
+    def wait_for_close(self) -> None:
+        """
+        Block until the browser window is closed (either by the user clicking
+        the X button or by calling ``close_browser()``).
+        Ctrl+C triggers a clean close.
+        """
+        if self._thread is None:
+            return
+        try:
+            while self._thread.is_alive():
+                self._thread.join(timeout=0.5)
+        except KeyboardInterrupt:
+            self.close_browser()
 
     # ------------------------------------------------------------------ #
     # Post-sim / replay                                                    #
@@ -574,7 +602,7 @@ class MobilityVisualizer:
         return self.replay_from_recorder(rec, save_path, open_browser)
 
     # ------------------------------------------------------------------ #
-    # Static helper                                                        #
+    # Static helper                                                      #
     # ------------------------------------------------------------------ #
 
     @staticmethod
@@ -629,18 +657,17 @@ class MobilityVisualizer:
         print(f"[MobilityVisualizer] Interactive map ({mode}) saved → {filepath}")
 
     # ------------------------------------------------------------------ #
-    # Internal helpers                                                      #
+    # Internal helpers                                                   #
     # ------------------------------------------------------------------ #
 
     def _write_placeholder(self) -> None:
         html = (
             "<!DOCTYPE html><html><head>"
-            f'<meta http-equiv="refresh" content="{max(1, int(self._update_interval))}">'
             "<title>ENIGMA Mobility – loading…</title></head>"
             "<body style='font-family:sans-serif;padding:40px'>"
             "<h2>&#9203; Simulation starting – map will appear shortly…</h2>"
-            "<p>This page refreshes automatically every "
-            f"{self._update_interval:.0f} s.</p></body></html>"
+            "<p>This page is controlled by Playwright.</p>"
+            "</body></html>"
         )
         os.makedirs(os.path.dirname(self._live_path) or ".", exist_ok=True)
         with open(self._live_path, "w") as f:
@@ -673,21 +700,136 @@ class MobilityVisualizer:
             os.remove(tmp)
             if self._offline:
                 content = _embed_cdn_resources(content)
-            refresh_tag = (
-                f'<meta http-equiv="refresh" '
-                f'content="{max(1, int(self._update_interval))}">'
-            )
-            content = content.replace("<head>", f"<head>{refresh_tag}", 1)
             with open(self._live_path, "w") as f:
                 f.write(content)
-            os.remove(tmp)
         except Exception as exc:
             print(f"[MobilityVisualizer] warning: could not write live map: {exc}")
 
     def _refresh_loop(self) -> None:
-        while self._running:
-            time.sleep(self._update_interval)
-            self._write_live_map()
+        self._refresh_loop_playwright()
+
+    def _refresh_loop_playwright(self) -> None:
+        """
+        Background thread that:
+        1. Launches a visible Playwright/Chromium browser at the live HTML file.
+        2. Rewrites the file every *update_interval_s* real-time seconds and
+           calls ``page.reload()`` – no meta-refresh needed, no caching issues,
+           works with any ``file://`` path regardless of Snap AppArmor rules.
+        3. After the simulation ends (``_running`` becomes False) does one final
+           write+reload, then waits for ``show_final()`` / ``close_browser()``
+           commands from the main thread.
+        """
+        try:
+            from playwright.sync_api import sync_playwright  # type: ignore
+        except ImportError:
+            print(
+                "[MobilityVisualizer] ERROR: playwright not installed.\n"
+                "  pip install playwright && playwright install chromium"
+            )
+            return
+
+        live_url = f"file://{self._live_path}"
+        try:
+            with sync_playwright() as pw:
+                browser = pw.chromium.launch(
+                    headless=False,
+                    args=[
+                        "--allow-file-access-from-files",
+                        "--disable-web-security",
+                        "--no-sandbox",
+                        "--start-maximized",
+                    ],
+                )
+                # Event set when the browser window is closed by the user or
+                # the browser process exits for any reason.
+                _closed = threading.Event()
+                browser.on("disconnected", lambda _b: _closed.set())
+
+                try:
+                    context = browser.new_context(
+                        # Allow all file:// origins so folium CDN-less maps render.
+                        bypass_csp=True,
+                        no_viewport=True,   # let the OS/window manager set the size
+                    )
+                    page = context.new_page()
+                    # "close" fires immediately when the user closes the
+                    # window/tab – more reliable than the browser-level
+                    # "disconnected" event in the sync API.
+                    page.on("close", lambda _p: _closed.set())
+                    page.goto(live_url)
+                    # Maximize / fullscreen the window
+                    try:
+                        page.evaluate("() => document.documentElement.requestFullscreen()")
+                    except Exception:
+                        pass  # not all platforms support the Fullscreen API via file://
+                    print(
+                        f"[MobilityVisualizer] Playwright browser opened: {live_url}"
+                    )
+
+                    # ---- live refresh loop ------------------------------------ #
+                    while self._running and not _closed.is_set():
+                        time.sleep(self._update_interval)
+                        if _closed.is_set():
+                            break
+                        self._write_live_map()
+                        if not _closed.is_set():
+                            try:
+                                page.reload()
+                            except Exception:
+                                _closed.set()
+                                break
+
+                    # ---- simulation ended: final snapshot -------------------- #
+                    if not _closed.is_set():
+                        self._write_live_map()
+                        try:
+                            page.reload()
+                        except Exception:
+                            _closed.set()
+
+                    # ---- wait for show_final() / close_browser() ------------- #
+                    # Drain the command queue; None = close,  str = navigate.
+                    # We detect browser closure by actively pinging the page
+                    # with page.evaluate("1") on every idle tick – this makes a
+                    # real CDP round-trip and throws the instant Chromium is gone,
+                    # regardless of whether Playwright fires "close"/"disconnected"
+                    # events promptly in the sync API.
+                    while not _closed.is_set():
+                        try:
+                            cmd = self._playwright_queue.get(timeout=0.1)
+                            if cmd is None:
+                                break
+                            if isinstance(cmd, str):
+                                try:
+                                    page.goto(cmd)
+                                except Exception:
+                                    _closed.set()
+                                    break
+                        except queue.Empty:
+                            # No command – ping the page to detect a closed browser.
+                            try:
+                                page.evaluate("1")
+                            except Exception:
+                                _closed.set()
+                                break
+
+                    if not _closed.is_set():
+                        try:
+                            browser.close()
+                        except Exception:
+                            pass
+
+                except KeyboardInterrupt:
+                    # Ctrl+C delivered to this background thread – close quietly.
+                    print("[MobilityVisualizer] Playwright thread interrupted; closing browser.")
+                    if not _closed.is_set():
+                        try:
+                            browser.close()
+                        except Exception:
+                            pass
+
+        except Exception as exc:
+            print(f"[MobilityVisualizer] Playwright error: {exc}")
 
     # ------------------------------------------------------------------ #
     # Load helpers for replay                                              #

@@ -13,7 +13,8 @@ A C++ project that enables creation of XML platforms for Edge, Fog, and Cloud in
 
 - Python 3.8+
 - SimGrid Python bindings (`libsimgrid-dev` includes them)
-- `folium` (`pip install folium`) – for interactive map visualization
+- `folium` (`pip install folium`) – interactive map generation
+- `playwright` (`pip install playwright && playwright install chromium`) – live browser visualization
 
 ## SimGrid Installation
 
@@ -266,46 +267,28 @@ After the simulation, open the generated `mobility_map.html` in any browser:
 
 ##### Online mode (default)
 
-The HTML references CDN URLs for Leaflet, jQuery, etc.  Browsers block these
-when opening a `file://` URL (CORS restriction), so you need a local HTTP server:
-
-```bash
-# Start a local server in the output directory
-cd /tmp/coords2_out
-python3 -m http.server 8765
-
-# Open in browser
-xdg-open http://localhost:8765/trajectory_map.html
-
-# Stop the server when done
-kill $(lsof -ti:8765)
-# or
-pkill -f "http.server 8765"
-```
+Playwright opens Chromium directly, which bypasses the `file://` CORS
+restrictions that normal browsers enforce.  The map loads CDN resources
+(Leaflet, jQuery, etc.) from the internet – no local HTTP server needed.
 
 ##### Offline mode (`--offline`)
 
-Downloads and embeds all JS/CSS inline so the HTML opens directly as `file://`
-without a local server.  The file will be ~6.5 MB.  Map tiles
-(OpenStreetMap background) are still fetched live, so an internet connection is
-needed to see the map background.
-
+Downloads and embeds all JS/CSS inline into the HTML file so it works
+perfectly as `file://` even without internet access.  Map tiles
+(OpenStreetMap background) are still fetched live.  The file will be ~6.5 MB.
 
 ```bash
-# Python simulation test
-python3 src/python/tests/mobility_test.py platform.xml --offline
+# Online (default) – CDN resources loaded at view time
+python3 src/python/tests/mobility_test.py platforms/my_platform.xml
 
-# Standalone viewer
-python3 src/python/tools/mobility_viewer.py snapshots.json --offline
-
-# Then open directly (no server needed)
-xdg-open trajectory_map.html
+# Offline – everything inlined, opens as file:// without internet
+python3 src/python/tests/mobility_test.py platforms/my_platform.xml --offline
 ```
 
-| Mode | HTML opens as `file://` | Needs internet to view | File size |
+| Mode | CDN resources | Needs internet to view | HTML file size |
 |------|:---:|:---:|:---:|
-| `--online` (default) | ❌ requires HTTP server | ✅ CDN + tiles | ~1.5 MB |
-| `--offline` | ✅ directly | ✅ tiles only | ~6.5 MB |
+| `--online` (default) | fetched at view time | ✅ CDN + tiles | ~1.5 MB |
+| `--offline` | embedded inline | tiles only | ~6.5 MB |
 
 You can also generate the map from any previously saved snapshot file:
 
@@ -327,24 +310,54 @@ python3 src/python/tools/mobility_viewer.py /tmp/cpp_mob_out_snapshots.json
 
 #### Live map during simulation
 
-Instantiate `MobilityVisualizer` before the simulation and pass it to `MobilityManager`.  A background thread rebuilds the map every few seconds; any browser tab with the file open will auto-refresh.
+Instantiate `MobilityVisualizer` before the simulation and pass it to `MobilityManager`.  A Playwright/Chromium window opens automatically and the map refreshes every few seconds.  When the simulation ends the final map is loaded in the same window; the program exits automatically when you close the browser.
 
 ```python
 viz = MobilityVisualizer(
     title="My Sim – Live",
     live_path="/tmp/mobility_live.html",
     update_interval_s=5.0,
-    auto_open=True,              # opens browser automatically
 )
-viz.start()
+viz.start()   # opens Chromium automatically
 
 mob = MobilityManager(e, coords_dir="platforms/coords/", visualizer=viz)
 mob.start_periodic_actor(e, 0.5)
 e.run()
 
-viz.stop()
-viz.replay_from_recorder(mob.recorder, save_path="final_map.html")
+viz.stop()                                            # keeps browser open
+viz.show_final("final_map.html")                      # navigate to final map
+viz.wait_for_close()                                  # blocks until user closes browser
 ```
+
+#### mobility_test.py – available flags
+
+The Python simulation test (`src/python/tests/mobility_test.py`) accepts the following options:
+
+```
+python3 src/python/tests/mobility_test.py <platform.xml> [options]
+```
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--coords-dir <dir>` | from XML | Override the `mobility_dir` property in the platform XML |
+| `--output <dir>` | `tests/mobility_output/` | Directory where all output files are written |
+| `--interval <s>` | `0.5` | Snapshot recording interval in simulation seconds |
+| `--no-live` | off | Disable the live Playwright browser; only record data and generate files |
+| `--no-replay` | off | Skip loading the final map into the browser after the simulation ends |
+| `--online` | ✅ default | Map HTML references CDN URLs (loaded at view time) |
+| `--offline` | off | Embed all JS/CSS inline so the map works as `file://` without internet |
+| `--fps <n>` | `15` | Replay animation frames-per-second |
+| `--save-replay` | off | Save the animated replay to `mobility_output/replay.gif` |
+
+**Browser behaviour by flag combination:**
+
+| Command | Browser opens? | Process exits when |
+|---------|:---:|--------------------|
+| *(default)* | ✅ live during sim + final map | User closes browser or Ctrl+C |
+| `--offline` | ✅ same, map embedded | User closes browser or Ctrl+C |
+| `--no-replay` | ✅ live during sim only | Simulation ends (browser auto-closes) |
+| `--no-live` | ❌ never | Immediately after files are saved |
+| `--no-live --no-replay` | ❌ never | Immediately after files are saved |
 
 ## Platform Generator Tool
 
